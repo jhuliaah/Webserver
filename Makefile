@@ -1,16 +1,24 @@
 NAME = webserv
-SRCS = srcs/main.cpp
+SRCS = srcs/main.cpp \
+	srcs/server/Server.cpp \
+	srcs/server/Socket.cpp
+OBJDIR = obj
+OBJS = $(SRCS:srcs/%.cpp=$(OBJDIR)/%.o)
 CC = c++
 CFLAGS = -std=c++98 -Wall -Wextra -Werror
 RM = rm -rf
 
 all : $(NAME)
 
-$(NAME) : $(SRCS)
-	$(CC) $(CFLAGS) $(SRCS) -o $(NAME)
+$(NAME) : $(OBJS)
+	$(CC) $(CFLAGS) $(OBJS) -o $(NAME)
+
+$(OBJDIR)/%.o : srcs/%.cpp
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean :
-	$(RM) *.o
+	$(RM) $(OBJDIR)
 
 fclean : clean
 	$(RM) $(NAME)
