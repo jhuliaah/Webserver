@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/05/28 15:15:04 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/03 17:52:41 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,26 +48,35 @@ void	Server::handleNewConnection(){
 	std::cout << "New client connected on fd: " << clientFd << std::endl;
 }
 
-void	Server::handleClientData(size_t index){
+void Server::writeToClient(size_t index){
+	int fd = _fds[index].fd;
+	std::string response = _clientResponses[fd];
+
+	send(fd, response.c_str(), response.size(), 0);
+	close(fd);
+
+	_clientResponses.erase(fd);
+	_fds.erase(_fds.begin() + index);
+}
+
+bool	Server::readFromClient(size_t index){
 	char buffer[4096];
 	std::memset(buffer, 0, sizeof(buffer));
 
 	int bytes = recv(_fds[index].fd, buffer, sizeof(buffer) - 1, 0);
 
 	if (bytes > 0){
-		std::cout << "Received data: " << buffer << std::endl;
-
 		std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
-		send(_fds[index].fd, response.c_str(), response.size(), 0);
-
-		close(_fds[index].fd);
-		_fds.erase(_fds.begin() + index);
+		_clientResponses[_fds[index].fd] = response;
+		_fds[index].events = POLLOUT;
+		return false;
 	}
 	else {
 		std::cout << "Client disconnected on fd: " << _fds[index].fd << std::endl;
 		
 		close(_fds[index].fd);
 		_fds.erase(_fds.begin() + index);
+		return true;
 	}
 }
 
@@ -84,10 +93,19 @@ void	Server::serverLoop(){
 		poll(&_fds[0], _fds.size(), -1);
 		for (size_t i = 0; i < _fds.size(); i++){
 			if (_fds[i].revents & POLLIN){
-				handleNewConnection();
+				if (_fds[i].fd == _serverFd){
+					handleNewConnection();
 				} else {
-					handleClientData(i);
-					--i;
+					bool clientDeleted = readFromClient(i);
+					if (clientDeleted == true){
+						--i;
+						continue;
+					}
+				}
+			}
+			if (_fds[i].revents & POLLOUT){
+				writeToClient(i);
+				i--;
 			}
 		}
 	}
