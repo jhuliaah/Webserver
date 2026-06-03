@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 17:39:04 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/05/28 14:43:22 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/03 17:24:14 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,6 +23,7 @@
 # include <unistd.h>		// close, read, write
 # include <cstring>			// memset, memcpy
 # include <vector>
+# include <map>
 
 # include "Socket.hpp"
 # include "Server.hpp"
