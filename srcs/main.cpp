@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 15:32:55 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/05/28 14:40:46 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/16 19:12:17 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,12 @@ int main(int argc, char* argv[]){
 	try {
 		Server server; // Cria a instância (chama o construtor do Socket implicitamente)
 
-		server.initServer(); // Configura a sockaddr_in, faz o bind() e o listen()
+		std::vector<int> fake_config_ports;
+		fake_config_ports.push_back(8080);
+		fake_config_ports.push_back(8085);
+		fake_config_ports.push_back(9005);
+		
+		server.initServer(fake_config_ports); // Configura a sockaddr_in, faz o bind() e o listen()
 		server.serverLoop(); // Inicia o vigia do poll() no loop infinito
 
 	} catch (const std::exception& e) {
