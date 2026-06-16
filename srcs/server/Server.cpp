@@ -6,34 +6,72 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/03 17:52:41 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/16 19:26:04 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/WebServer.hpp"
 
-void	Server::initServer(){
+//================================
+//			Constructors		//
+//================================
 
-	struct sockaddr_in address;
+Server::Server() {}
 
-	std::memset(&address, 0, sizeof(address));
-
-	address.sin_family		= AF_INET; // usando IPv4
-	address.sin_port		= htons(8080); // htons é um tradutor (portavai ser 8080)
-	address.sin_addr.s_addr	= INADDR_ANY; //qualquer ip ou interface configurada é aceita
-
-	//bind() -> este socket vai receber conexoes na porta 8080
-	if (bind(_serverFd, (struct sockaddr*)&address, sizeof(address)) == -1){
-		throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
-	if (listen(_serverFd, 10) == -1){
-		throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
+Server::~Server() {
+	for (size_t i = 0; i < _sockets.size(); i++){
+		close(_sockets[i]->getFd());
+		delete _sockets[i];
+	}
 }
 
-void	Server::handleNewConnection(){
+bool Server::isServerFd(int fd) {
+	for (size_t i = 0; i < _serverFds.size(); i++) {
+		if (_serverFds[i] == fd)
+			return true;
+	}
+	return false;
+}
+
+//================================
+//			Functions			//
+//================================
+
+void	Server::initServer(std::vector<int> ports){
+	for (size_t i = 0; i < ports.size(); i++){
+		Socket*	newSocket = new Socket();
+		int		fd = newSocket->getFd();
+	
+		struct	sockaddr_in address;
+		std::memset(&address, 0, sizeof(address));
+		address.sin_family		= AF_INET; // usando IPv4
+		address.sin_port		= htons(ports[i]); // htons é um tradutor (portavai ser 8080)
+		address.sin_addr.s_addr	= INADDR_ANY; //qualquer ip ou interface configurada é aceita
+	
+		//bind() -> este socket vai receber conexoes na porta 8080
+		if (bind(fd, (struct sockaddr*)&address, sizeof(address)) == -1){
+			throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
+		if (listen(fd, 10) == -1){
+			throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
+	
+		_sockets.push_back(newSocket);
+		_serverFds.push_back(fd);
+	
+		struct pollfd serverPfd;
+		serverPfd.fd		= fd;
+		serverPfd.events	= POLLIN;
+		serverPfd.revents	= 0;
+		_fds.push_back(serverPfd);
+
+		std::cout << "Server listening on port " << ports[i] << " (fd: " << fd << ")" << std::endl;
+	}
+}
+
+void	Server::handleNewConnection(int serverFd){
 	struct sockaddr_in clientAddr;
 	socklen_t clientLen = sizeof(clientAddr);
 
-	int clientFd = accept(_serverFd, (struct sockaddr*)&clientAddr, &clientLen);
+	int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
 	if (clientFd == -1)
 		return;
 
@@ -81,20 +119,13 @@ bool	Server::readFromClient(size_t index){
 }
 
 void	Server::serverLoop(){
-	struct pollfd _serverPfd;
-
-	_serverPfd.fd		= _serverFd;
-	_serverPfd.events	= POLLIN;
-	_serverPfd.revents	= 0;
-
-	_fds.push_back(_serverPfd);
-
 	while (true){
 		poll(&_fds[0], _fds.size(), -1);
 		for (size_t i = 0; i < _fds.size(); i++){
+
 			if (_fds[i].revents & POLLIN){
-				if (_fds[i].fd == _serverFd){
-					handleNewConnection();
+				if (isServerFd(_fds[i].fd)){
+					handleNewConnection(_fds[i].fd);
 				} else {
 					bool clientDeleted = readFromClient(i);
 					if (clientDeleted == true){
