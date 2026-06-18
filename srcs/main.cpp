@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 15:32:55 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/16 19:12:17 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/16 21:29:30 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,9 +23,9 @@ int main(int argc, char* argv[]){
 		Server server; // Cria a instância (chama o construtor do Socket implicitamente)
 
 		std::vector<int> fake_config_ports;
-		fake_config_ports.push_back(8080);
-		fake_config_ports.push_back(8085);
-		fake_config_ports.push_back(9005);
+		fake_config_ports.push_back(8081);
+		fake_config_ports.push_back(8086);
+		fake_config_ports.push_back(9006);
 		
 		server.initServer(fake_config_ports); // Configura a sockaddr_in, faz o bind() e o listen()
 		server.serverLoop(); // Inicia o vigia do poll() no loop infinito

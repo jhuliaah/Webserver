@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/16 18:45:55 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/16 21:00:51 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,12 +18,12 @@ class Server{
 	private:
 		std::vector<Socket*>		_sockets;
 		std::vector<int>			_serverFds;
-		std::vector<struct pollfd>	_fds;
+		int							_epollFd;
 		std::map<int, std::string>	_clientResponses;
 
 		void	handleNewConnection(int server_fd);
-		bool	readFromClient(size_t index);
-		void	writeToClient(size_t index);
+		bool	readFromClient(int fd);
+		void	writeToClient(int fd);
 		bool	isServerFd(int fd);
 
 	public:
