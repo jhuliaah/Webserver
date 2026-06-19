@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/16 21:00:51 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/18 16:40:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,6 +20,7 @@ class Server{
 		std::vector<int>			_serverFds;
 		int							_epollFd;
 		std::map<int, std::string>	_clientResponses;
+		std::map<int, std::string>	_clientRequest;
 
 		void	handleNewConnection(int server_fd);
 		bool	readFromClient(int fd);

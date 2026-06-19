@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/16 21:26:22 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/18 16:45:25 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -111,20 +111,30 @@ bool	Server::readFromClient(int fd){
 	int bytes = recv(fd, buffer, sizeof(buffer) - 1, 0);
 
 	if (bytes > 0){
-		std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
-		_clientResponses[fd] = response;
+		_clientRequest[fd].append(buffer, bytes);
+		
+		if (_clientRequest[fd].find("\r\n\r\n") != std::string::npos) {
+			std::cout << "Requisicao completa recebida do fd: " << fd << std::endl;
+			
+			std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
+			_clientResponses[fd] = response;
 
-		struct epoll_event event;
-		event.events = EPOLLOUT;
-		event.data.fd = fd;
-		epoll_ctl(_epollFd, EPOLL_CTL_MOD, fd, &event);
+			struct epoll_event event;
+			event.events = EPOLLOUT;
+			event.data.fd = fd;
+			epoll_ctl(_epollFd, EPOLL_CTL_MOD, fd, &event);
 
+			_clientRequest.erase(fd);
+		}
 		return false;
 	}
 	else {
 		std::cout << "Client disconnected on fd: " << fd << std::endl;
 		epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
 		close(fd);
+
+		_clientRequest.erase(fd);
+		_clientResponses.erase(fd);
 		return true;
 	}
 }
