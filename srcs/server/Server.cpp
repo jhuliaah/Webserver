@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/18 16:45:25 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/19 14:42:15 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -104,6 +104,38 @@ void Server::writeToClient(int fd){
 	_clientResponses.erase(fd);
 }
 
+std::string Server::_buildStaticResponse(){
+	std::ifstream	file("./www/index.html");
+	std::string		finalResponse;
+
+	if (file.is_open()){
+		std::stringstream buffer;
+		buffer << file.rdbuf();
+		std::string body = buffer.str();
+		file.close();
+
+		std::stringstream responseStream;
+		responseStream << "HTTP/1.1 200 OK\r\n";
+		responseStream << "Content-Type: text/html; charset=utf-8\r\n";
+		responseStream << "Content-Length: " << body.length() << "\r\n";
+		responseStream << "\r\n";
+		responseStream << body;
+
+		finalResponse = responseStream.str();
+	} else {
+		std::string errorBody = "<html><body><center><h1>404 Not Found</h1><p>O ficheiro sumiu!</p></center></body></html>";
+		std::stringstream responseStream;
+		responseStream << "HTTP/1.1 404 Not Found\r\n";
+		responseStream << "Content-Type: text/html\r\n";
+		responseStream << "Content-Length: " << errorBody.length() << "\r\n\r\n";
+		responseStream << errorBody;
+
+		finalResponse = responseStream.str();
+	}
+
+	return finalResponse;
+}
+
 bool	Server::readFromClient(int fd){
 	char buffer[4096];
 	std::memset(buffer, 0, sizeof(buffer));
@@ -116,8 +148,7 @@ bool	Server::readFromClient(int fd){
 		if (_clientRequest[fd].find("\r\n\r\n") != std::string::npos) {
 			std::cout << "Requisicao completa recebida do fd: " << fd << std::endl;
 			
-			std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
-			_clientResponses[fd] = response;
+			_clientResponses[fd] = _buildStaticResponse();
 
 			struct epoll_event event;
 			event.events = EPOLLOUT;
