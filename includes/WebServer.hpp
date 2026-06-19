@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 17:39:04 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/16 21:02:11 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/19 14:05:44 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,9 @@
 # include <cstring>			// memset, memcpy
 # include <vector>
 # include <map>
+
+# include <fstream>
+# include <sstream>
 
 # include "Socket.hpp"
 # include "Server.hpp"
