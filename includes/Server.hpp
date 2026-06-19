@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/18 16:40:08 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/19 14:09:27 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -26,6 +26,8 @@ class Server{
 		bool	readFromClient(int fd);
 		void	writeToClient(int fd);
 		bool	isServerFd(int fd);
+
+		std::string _buildStaticResponse();
 
 	public:
 		Server();
