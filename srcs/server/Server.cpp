@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/03 17:52:41 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/20 13:11:47 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@ void	Server::initServer(){
 	//bind() -> este socket vai receber conexoes na porta 8080
 	if (bind(_serverFd, (struct sockaddr*)&address, sizeof(address)) == -1){
 		throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
-	if (listen(_serverFd, 10) == -1){
+	if (listen(_serverFd, SOMAXCONN) == -1){
 		throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
 }
 
