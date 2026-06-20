@@ -6,12 +6,12 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/06/13 18:13:26 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/06/20 09:38:56 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../include/HttpRequest.hpp"
-#include "../include/HttpResponse.hpp"
+#include "../includes/HttpRequest.hpp"
+#include "../includes/HttpResponse.hpp"
 
 
 int main(void)

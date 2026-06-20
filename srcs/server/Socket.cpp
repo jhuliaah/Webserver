@@ -3,26 +3,35 @@
 /*                                                        :::      ::::::::   */
 /*   Socket.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 17:38:28 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/05/28 10:15:35 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/20 19:42:39 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/WebServer.hpp"
 
-//AF_INET — família de endereços IPv4 (endereços tipo 192.168.0.1)
-//SOCK_STREAM — tipo TCP — conexão confiável, com garantia de entrega e ordem. O HTTP precisa disso.
-//0 — protocolo automático.
+// AF_INET — família de endereços IPv4 (endereços tipo 192.168.0.1)
+// SOCK_STREAM — tipo TCP — conexão confiável, com garantia de entrega e ordem.
+// O HTTP precisa disso.
+// 0 — protocolo automático.
 
-Socket::Socket(){
+Socket::Socket()
+{
 	_serverFd = socket(AF_INET, SOCK_STREAM, 0);
 	if (_serverFd == -1)
 		throw SocketException("ServerFd failed -> " + std::string(strerror(errno)));
 	SocketConfig();
 	nonBlocking();
 };
+
+int Socket::getFd() const
+{
+	return _serverFd;
+};
+
+
 
 //=========================//
 // Configuraçoes do Socket //

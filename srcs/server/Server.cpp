@@ -6,27 +6,37 @@
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/20 13:11:47 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/06/20 20:21:14 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/WebServer.hpp"
 
-void	Server::initServer(){
-
-	struct sockaddr_in address;
+void	Server::initServer()
+{
+	struct sockaddr_in	address;
+	Socket				socket; // Cria a instância do Socket (chama o construtor, que cria o socket e configura ele)
 
 	std::memset(&address, 0, sizeof(address));
+	/* Zeramos a sockaddr_in para evitar valores aleatórios nos campos que
+	não preenchemos. Essa struct será enviada via bind() para processamento
+	pelo kernel, cuja implementação não controlamos e pode variar de sistema
+	para sistema. Assim, a struct sempre começa no mesmo estado, o que deixa
+	o comportamento mais previsível e facilita encontrar bugs. */
 
-	address.sin_family		= AF_INET; // usando IPv4
-	address.sin_port		= htons(8080); // htons é um tradutor (portavai ser 8080)
-	address.sin_addr.s_addr	= INADDR_ANY; //qualquer ip ou interface configurada é aceita
+	address.sin_family		= AF_INET; 		// usando IPv4
+	address.sin_port		= htons(8080);	// htons é um tradutor (porta vai ser 8080)
+	address.sin_addr.s_addr	= INADDR_ANY;	// qualquer ip ou interface configurada é aceita
 
 	//bind() -> este socket vai receber conexoes na porta 8080
-	if (bind(_serverFd, (struct sockaddr*)&address, sizeof(address)) == -1){
-		throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
-	if (listen(_serverFd, SOMAXCONN) == -1){
-		throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
+	if (bind(socket.getFd(), (struct sockaddr*)&address, sizeof(address)) == -1)
+	{
+		throw ServerException(std::string("bind() system call failed -> ") + strerror(errno));
+	}
+	if (listen(socket.getFd(), SOMAXCONN) == -1)
+	{
+		throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));
+	}
 }
 
 void	Server::handleNewConnection(){
