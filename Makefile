@@ -1,7 +1,8 @@
 NAME = webserv
 SRCS = srcs/main.cpp \
 	srcs/server/Server.cpp \
-	srcs/server/Socket.cpp
+	srcs/server/Socket.cpp \
+	srcs/server/Client.cpp
 OBJDIR = obj
 OBJS = $(SRCS:srcs/%.cpp=$(OBJDIR)/%.o)
 CC = c++

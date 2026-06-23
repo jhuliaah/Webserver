@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/19 14:42:15 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/23 15:29:14 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,7 +51,7 @@ void	Server::initServer(std::vector<int> ports){
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family		= AF_INET; // usando IPv4
 		address.sin_port		= htons(ports[i]); // htons é um tradutor (portavai ser 8080)
-		address.sin_addr.s_addr	= INADDR_ANY; //qualquer ip ou interface configurada é aceita
+		address.sin_addr.s_addr	= inet_addr("127.0.0.1"); //por enquanto só vai aceitar conexões do localhost, mas futuramente vamos aceitar de qualquer lugar (INADDR_ANY)
 	
 		//bind() -> este socket vai receber conexoes na porta 8080
 		if (bind(fd, (struct sockaddr*)&address, sizeof(address)) == -1){
@@ -72,126 +72,93 @@ void	Server::initServer(std::vector<int> ports){
 	}
 }
 
-void	Server::handleNewConnection(int serverFd){
-	struct sockaddr_in clientAddr;
-	socklen_t clientLen = sizeof(clientAddr);
+void Server::handleNewConnection(int serverFd){
+    struct sockaddr_in clientAddr;
+    socklen_t clientLen = sizeof(clientAddr);
 
-	int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
-	if (clientFd == -1)
-		return;
+    int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
+    if (clientFd == -1) return;
 
-	fcntl(clientFd, F_SETFL, O_NONBLOCK);
+    fcntl(clientFd, F_SETFL, O_NONBLOCK);
 
-	struct epoll_event event;
-	event.events = EPOLLIN;
-	event.data.fd = clientFd;
-	if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, clientFd, &event) == -1){
-		close(clientFd);
-		return;
-	}
-
-	std::cout << "New client connected on fd: " << clientFd << std::endl;
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = clientFd;
+    if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, clientFd, &event) == -1){
+        close(clientFd);
+        return;
+    }
+    
+    _clients[clientFd] = new Client(clientFd);
+    std::cout << "New client connected on fd: " << clientFd << std::endl;
 }
 
-void Server::writeToClient(int fd){
-	std::string response = _clientResponses[fd];
-
-	send(fd, response.c_str(), response.size(), 0);
-
-	epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
-	close(fd);
-
-	_clientResponses.erase(fd);
+void Server::removeClient(int fd) {
+    epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
+    delete _clients[fd];
+    _clients.erase(fd);
 }
 
-std::string Server::_buildStaticResponse(){
-	std::ifstream	file("./www/index.html");
-	std::string		finalResponse;
+void Server::serverLoop(){
+    const int MAX_EVENTS = 64;
+    struct epoll_event events[MAX_EVENTS];
 
-	if (file.is_open()){
-		std::stringstream buffer;
-		buffer << file.rdbuf();
-		std::string body = buffer.str();
-		file.close();
+    while (true){
+        int numEvents = epoll_wait(_epollFd, events, MAX_EVENTS, 2000);
+        if(numEvents == -1) continue;
+        
+        for (int i = 0; i < numEvents; i++){
+            int currentFd = events[i].data.fd;
 
-		std::stringstream responseStream;
-		responseStream << "HTTP/1.1 200 OK\r\n";
-		responseStream << "Content-Type: text/html; charset=utf-8\r\n";
-		responseStream << "Content-Length: " << body.length() << "\r\n";
-		responseStream << "\r\n";
-		responseStream << body;
-
-		finalResponse = responseStream.str();
-	} else {
-		std::string errorBody = "<html><body><center><h1>404 Not Found</h1><p>O ficheiro sumiu!</p></center></body></html>";
-		std::stringstream responseStream;
-		responseStream << "HTTP/1.1 404 Not Found\r\n";
-		responseStream << "Content-Type: text/html\r\n";
-		responseStream << "Content-Length: " << errorBody.length() << "\r\n\r\n";
-		responseStream << errorBody;
-
-		finalResponse = responseStream.str();
-	}
-
-	return finalResponse;
+            if (events[i].events & EPOLLIN){
+                if (isServerFd(currentFd)){
+                    handleNewConnection(currentFd);
+                } else {
+                    // Manda o Cliente ler os próprios dados
+                    Client* client = _clients[currentFd];
+                    if (client->readData() == true) {
+                        
+                        if (client->getState() == Client::CLOSED) {
+                            removeClient(currentFd);
+                        } 
+                        else if (client->getState() == Client::WRITING) {
+                            // O Cliente terminou de ler, muda para EPOLLOUT
+                            struct epoll_event event;
+                            event.events = EPOLLOUT;
+                            event.data.fd = currentFd;
+                            epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                        }
+                    }
+                }
+            }
+            else if (events[i].events & EPOLLOUT){
+                // Manda o Cliente enviar os próprios dados
+                Client* client = _clients[currentFd];
+                if (client->writeData() == true) {
+                    removeClient(currentFd);
+                }
+            }
+        }
+        checkTimeouts();
+    }
 }
 
-bool	Server::readFromClient(int fd){
-	char buffer[4096];
-	std::memset(buffer, 0, sizeof(buffer));
-
-	int bytes = recv(fd, buffer, sizeof(buffer) - 1, 0);
-
-	if (bytes > 0){
-		_clientRequest[fd].append(buffer, bytes);
-		
-		if (_clientRequest[fd].find("\r\n\r\n") != std::string::npos) {
-			std::cout << "Requisicao completa recebida do fd: " << fd << std::endl;
-			
-			_clientResponses[fd] = _buildStaticResponse();
-
-			struct epoll_event event;
-			event.events = EPOLLOUT;
-			event.data.fd = fd;
-			epoll_ctl(_epollFd, EPOLL_CTL_MOD, fd, &event);
-
-			_clientRequest.erase(fd);
-		}
-		return false;
-	}
-	else {
-		std::cout << "Client disconnected on fd: " << fd << std::endl;
-		epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
-		close(fd);
-
-		_clientRequest.erase(fd);
-		_clientResponses.erase(fd);
-		return true;
-	}
-}
-
-void	Server::serverLoop(){
-	const int MAX_EVENTS = 64;
-	struct epoll_event events[MAX_EVENTS];
-
-	while (true){
-		int numEvents = epoll_wait(_epollFd, events, MAX_EVENTS, -1);
-		if(numEvents == -1)
-			continue;
-		
-		for (int i = 0; i < numEvents; i++){
-			int currentFd = events[i].data.fd;
-
-			if (events[i].events & EPOLLIN){
-				if (isServerFd(currentFd)){
-					handleNewConnection(currentFd);
-				} else {
-					readFromClient(currentFd);
-				}
-			}
-			else if (events[i].events & EPOLLOUT){
-				writeToClient(currentFd);
-			}
-		}
-	}
+void Server::checkTimeouts() {
+    time_t now = time(NULL);
+    std::map<int, Client*>::iterator it = _clients.begin();
+    
+    while (it != _clients.end()) {
+        Client* client = it->second;
+        
+        if (client->isTimeout(now, 60)) { // 60 segundos
+            std::cout << "[CEIFADOR] Cliente no fd " << it->first << " expulso!" << std::endl;
+            
+            int fdToErase = it->first;
+            ++it;
+            removeClient(fdToErase);
+        } else {
+            ++it;
+        }
+    }
 }
