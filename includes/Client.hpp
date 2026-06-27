@@ -1,41 +1,40 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   Server.hpp                                         :+:      :+:    :+:   */
+/*   Client.hpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 12:37:13 by ratanaka         ###   ########.fr       */
+/*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/23 15:29:56 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #pragma once
 
-# include "WebServer.hpp"
+#include "WebServer.hpp"
 
-class Client;
+class Client {
+	public:
+		enum State {READING, WRITING, CLOSED};
 
-class Server{
 	private:
-		std::vector<Socket*>		_sockets;
-		std::vector<int>			_serverFds;
-		int							_epollFd;
-		std::map<int, Client*>      _clients;
-
-		void	handleNewConnection(int server_fd);
-		bool	readFromClient(int fd);
-		void	writeToClient(int fd);
-		bool	isServerFd(int fd);
-		void	checkTimeouts();
-
-		void removeClient(int fd);
+		int			_fd;
+		time_t		_lastActivity;
+		std::string	_rawRequest;
+		std::string	_response;
+		State		_state;
 
 		std::string _buildStaticResponse();
-
 	public:
-		Server();
-		~Server();
-		void	initServer(std::vector<int> ports);
-		void	serverLoop();
+
+		Client(int fd);
+		~Client();
+
+		bool readData();
+		bool writeData();
+		bool isTimeout(time_t currentTime, int timeoutLimit);
+
+		int		getFd() const { return _fd; }
+		State	getState() const { return _state; }
 };

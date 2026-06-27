@@ -1,4 +1,38 @@
 
+/* ==================== ./includes/Server.hpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Server.hpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/20 20:19:54 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#pragma once
+
+# include "WebServer.hpp"
+
+class Server
+{
+	private:
+		Socket						_socket;
+		std::vector<t_pollfd>	_fds;
+		std::map<int, std::string>	_clientResponses;
+
+		void	handleNewConnection();
+		bool	readFromClient(size_t index);
+		void	writeToClient(size_t index);
+
+	public:
+		void	initServer();
+		void	serverLoop();
+};
+
 /* ==================== ./includes/Exeptions.hpp ==================== */
 
 /* ************************************************************************** */
@@ -17,150 +51,28 @@
 
 # include "WebServer.hpp"
 
-class ServerException : public std::exception {
-	private :
+class ServerException : public std::exception
+{
+	private:
 		std::string _msg;
-	public :
+
+	public:
 		ServerException(const std::string& error_detail) :_msg("Server Error: " + error_detail) {}
 		virtual ~ServerException() throw() {}
 		virtual const char* what() const throw() {return _msg.c_str();}
 };
 
-class SocketException : public std::exception {
+class SocketException : public std::exception
+ {
 	private:
 		std::string _msg;
+
 	public:
 		SocketException(const std::string& detail) : _msg("Socket Error: " + detail) {}
 		virtual ~SocketException() throw() {}
 		virtual const char* what() const throw() { return _msg.c_str(); }
 };
-/* ==================== ./includes/Server.hpp ==================== */
 
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   Server.hpp                                         :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/20 18:58:15 by eduribei         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-#pragma once
-
-# include "WebServer.hpp"
-
-class Server : public Socket
-{
-	private:
-		std::vector<struct pollfd>	_fds;
-		std::map<int, std::string>	_clientResponses;
-
-		void	handleNewConnection();
-		bool	readFromClient(size_t index);
-		void	writeToClient(size_t index);
-
-	public:
-		void	initServer();
-		void	serverLoop();
-};
-
-/* ==================== ./includes/Socket.hpp ==================== */
-
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   Socket.hpp                                         :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/05/26 17:34:33 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/20 18:39:40 by eduribei         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-#pragma once
-
-# include "WebServer.hpp"
-
-class Socket{
-	protected :
-		int	_serverFd;
-	public :
-		Socket();
-
-		void	SocketConfig();
-		void	nonBlocking();
-		int		getFd() const {return _serverFd;};
-};
-/* ==================== ./includes/WebServer.hpp ==================== */
-
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   WebServer.hpp                                      :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/05/26 17:39:04 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/03 17:24:14 by ratanaka         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-#pragma once
-
-# include <iostream>
-# include <string>
-
-# include <sys/socket.h>	// socket, bind, listen, accept, send, recv
-# include <cerrno>			// errno
-# include <netinet/in.h>	// sockaddr_in, INADDR_ANY, htons
-# include <fcntl.h>			// fcntl, O_NONBLOCK
-# include <poll.h>			// poll, struct pollfd
-# include <unistd.h>		// close, read, write
-# include <cstring>			// memset, memcpy
-# include <vector>
-# include <map>
-
-# include "Socket.hpp"
-# include "Server.hpp"
-# include "Exeptions.hpp"
-/* ==================== ./includes/CgiRequest.hpp ==================== */
-
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   CgiRequest.hpp                                     :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
-/*   Updated: 2026/06/13 18:20:17 by eduribei         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
-
-#ifndef CGI_REQUEST_HPP
-# define CGI_REQUEST_HPP
-
-# include <string>
-
-class CgiRequest
-{
-	private:
-		std::string _method;
-
-
-	public:
-		CgiRequest();
-		~CgiRequest();
-
-		const std::string&  getMethod() const;
-
-};
-
-#endif
 /* ==================== ./includes/HttpRequest.hpp ==================== */
 
 #ifndef HTTP_REQUEST_HPP
@@ -208,24 +120,36 @@ class HttpResponse
 };
 
 #endif // HTTPRESPONSE_HPP
-/* ==================== ./includes/IRequestHandler.hpp ==================== */
+/* ==================== ./includes/Socket.hpp ==================== */
 
-// Essa classe vai funcionar cmo a interface para lidar com request.
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Socket.hpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 17:34:33 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/20 19:27:48 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
 
-#ifndef IREQUESTHANDLER_HPP
-#define IREQUESTHANDLER_HPP
+#pragma once
 
-#include "HttpRequest.hpp"
-#include "HttpResponse.hpp"
+# include "WebServer.hpp"
 
-class IRequestHandler
+class Socket
 {
+	protected:
+		int	_serverFd;
+
 	public:
-	    virtual ~IRequestHandler(){};
-		virtual HttpResponse handle(const HttpRequest& request) = 0;
+		Socket();
+		void	SocketConfig();
+		void	nonBlocking();
+		int		getFd() const;
 };
 
-#endif
 /* ==================== ./includes/RouteConfig.hpp ==================== */
 
 #ifndef ROUTE_CONFIG_HPP
@@ -244,6 +168,92 @@ class RouteConfig
 
 		RouteConfig();
 		~RouteConfig();
+};
+
+#endif
+/* ==================== ./includes/WebServer.hpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   WebServer.hpp                                      :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 17:39:04 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/03 17:24:14 by ratanaka         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#pragma once
+
+# include <iostream>
+# include <string>
+
+# include <sys/socket.h>	// socket, bind, listen, accept, send, recv
+# include <cerrno>			// errno
+# include <netinet/in.h>	// sockaddr_in, INADDR_ANY, htons
+# include <fcntl.h>			// fcntl, O_NONBLOCK
+# include <poll.h>			// poll, t_pollfd
+# include <unistd.h>		// close, read, write
+# include <cstring>			// memset, memcpy
+# include <vector>
+# include <map>
+
+# include "Socket.hpp"
+# include "Server.hpp"
+# include "Exeptions.hpp"
+
+# define WEBSERV_PORT 8080
+/* ==================== ./includes/IRequestHandler.hpp ==================== */
+
+// Essa classe vai funcionar cmo a interface para lidar com request.
+
+#ifndef IREQUESTHANDLER_HPP
+#define IREQUESTHANDLER_HPP
+
+#include "HttpRequest.hpp"
+#include "HttpResponse.hpp"
+
+class IRequestHandler
+{
+	public:
+	    virtual ~IRequestHandler(){};
+		virtual HttpResponse handle(const HttpRequest& request) = 0;
+};
+
+#endif
+/* ==================== ./includes/CgiRequest.hpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   CgiRequest.hpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
+/*   Updated: 2026/06/13 18:20:17 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#ifndef CGI_REQUEST_HPP
+# define CGI_REQUEST_HPP
+
+# include <string>
+
+class CgiRequest
+{
+	private:
+		std::string _method;
+
+
+	public:
+		CgiRequest();
+		~CgiRequest();
+
+		const std::string&  getMethod() const;
+
 };
 
 #endif

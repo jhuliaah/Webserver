@@ -3,120 +3,162 @@
 /*                                                        :::      ::::::::   */
 /*   Server.cpp                                         :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/20 20:21:14 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/06/23 15:29:14 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/WebServer.hpp"
 
-void	Server::initServer()
-{
-	struct sockaddr_in	address;
-	Socket				socket; // Cria a instância do Socket (chama o construtor, que cria o socket e configura ele)
+//================================
+//			Constructors		//
+//================================
 
-	std::memset(&address, 0, sizeof(address));
-	/* Zeramos a sockaddr_in para evitar valores aleatórios nos campos que
-	não preenchemos. Essa struct será enviada via bind() para processamento
-	pelo kernel, cuja implementação não controlamos e pode variar de sistema
-	para sistema. Assim, a struct sempre começa no mesmo estado, o que deixa
-	o comportamento mais previsível e facilita encontrar bugs. */
+Server::Server() {
+	_epollFd = epoll_create(10);
+	if (_epollFd == -1)
+		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
+}
 
-	address.sin_family		= AF_INET; 		// usando IPv4
-	address.sin_port		= htons(8080);	// htons é um tradutor (porta vai ser 8080)
-	address.sin_addr.s_addr	= INADDR_ANY;	// qualquer ip ou interface configurada é aceita
-
-	//bind() -> este socket vai receber conexoes na porta 8080
-	if (bind(socket.getFd(), (struct sockaddr*)&address, sizeof(address)) == -1)
-	{
-		throw ServerException(std::string("bind() system call failed -> ") + strerror(errno));
+Server::~Server() {
+	for (size_t i = 0; i < _sockets.size(); i++){
+		close(_sockets[i]->getFd());
+		delete _sockets[i];
 	}
-	if (listen(socket.getFd(), SOMAXCONN) == -1)
-	{
-		throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));
+	close(_epollFd);
+}
+
+bool Server::isServerFd(int fd) {
+	for (size_t i = 0; i < _serverFds.size(); i++) {
+		if (_serverFds[i] == fd)
+			return true;
+	}
+	return false;
+}
+
+//================================
+//			Functions			//
+//================================
+
+void	Server::initServer(std::vector<int> ports){
+	for (size_t i = 0; i < ports.size(); i++){
+		Socket*	newSocket = new Socket();
+		int		fd = newSocket->getFd();
+	
+		struct	sockaddr_in address;
+		std::memset(&address, 0, sizeof(address));
+		address.sin_family		= AF_INET; // usando IPv4
+		address.sin_port		= htons(ports[i]); // htons é um tradutor (portavai ser 8080)
+		address.sin_addr.s_addr	= inet_addr("127.0.0.1"); //por enquanto só vai aceitar conexões do localhost, mas futuramente vamos aceitar de qualquer lugar (INADDR_ANY)
+	
+		//bind() -> este socket vai receber conexoes na porta 8080
+		if (bind(fd, (struct sockaddr*)&address, sizeof(address)) == -1){
+			throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
+		if (listen(fd, 10) == -1){
+			throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
+	
+		_sockets.push_back(newSocket);
+		_serverFds.push_back(fd);
+	
+		struct epoll_event event;
+		event.events = EPOLLIN;
+		event.data.fd = fd;
+		if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, fd, &event) == -1)
+			throw ServerException(std::string("epoll_ctl failed -> ") + strerror(errno));
+
+		std::cout << "Server listening on port " << ports[i] << " (fd: " << fd << ")" << std::endl;
 	}
 }
 
-void	Server::handleNewConnection(){
-	struct sockaddr_in clientAddr;
-	socklen_t clientLen = sizeof(clientAddr);
+void Server::handleNewConnection(int serverFd){
+    struct sockaddr_in clientAddr;
+    socklen_t clientLen = sizeof(clientAddr);
 
-	int clientFd = accept(_serverFd, (struct sockaddr*)&clientAddr, &clientLen);
-	if (clientFd == -1)
-		return;
+    int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
+    if (clientFd == -1) return;
 
-	fcntl(clientFd, F_SETFL, O_NONBLOCK);
+    fcntl(clientFd, F_SETFL, O_NONBLOCK);
 
-	struct pollfd clientPdf;
-	clientPdf.fd = clientFd;
-	clientPdf.events = POLLIN;
-	clientPdf.revents = 0;
-
-	_fds.push_back(clientPdf);
-	std::cout << "New client connected on fd: " << clientFd << std::endl;
+    struct epoll_event event;
+    event.events = EPOLLIN;
+    event.data.fd = clientFd;
+    if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, clientFd, &event) == -1){
+        close(clientFd);
+        return;
+    }
+    
+    _clients[clientFd] = new Client(clientFd);
+    std::cout << "New client connected on fd: " << clientFd << std::endl;
 }
 
-void Server::writeToClient(size_t index){
-	int fd = _fds[index].fd;
-	std::string response = _clientResponses[fd];
-
-	send(fd, response.c_str(), response.size(), 0);
-	close(fd);
-
-	_clientResponses.erase(fd);
-	_fds.erase(_fds.begin() + index);
+void Server::removeClient(int fd) {
+    epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
+    delete _clients[fd];
+    _clients.erase(fd);
 }
 
-bool	Server::readFromClient(size_t index){
-	char buffer[4096];
-	std::memset(buffer, 0, sizeof(buffer));
+void Server::serverLoop(){
+    const int MAX_EVENTS = 64;
+    struct epoll_event events[MAX_EVENTS];
 
-	int bytes = recv(_fds[index].fd, buffer, sizeof(buffer) - 1, 0);
+    while (true){
+        int numEvents = epoll_wait(_epollFd, events, MAX_EVENTS, 2000);
+        if(numEvents == -1) continue;
+        
+        for (int i = 0; i < numEvents; i++){
+            int currentFd = events[i].data.fd;
 
-	if (bytes > 0){
-		std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
-		_clientResponses[_fds[index].fd] = response;
-		_fds[index].events = POLLOUT;
-		return false;
-	}
-	else {
-		std::cout << "Client disconnected on fd: " << _fds[index].fd << std::endl;
-		
-		close(_fds[index].fd);
-		_fds.erase(_fds.begin() + index);
-		return true;
-	}
+            if (events[i].events & EPOLLIN){
+                if (isServerFd(currentFd)){
+                    handleNewConnection(currentFd);
+                } else {
+                    // Manda o Cliente ler os próprios dados
+                    Client* client = _clients[currentFd];
+                    if (client->readData() == true) {
+                        
+                        if (client->getState() == Client::CLOSED) {
+                            removeClient(currentFd);
+                        } 
+                        else if (client->getState() == Client::WRITING) {
+                            // O Cliente terminou de ler, muda para EPOLLOUT
+                            struct epoll_event event;
+                            event.events = EPOLLOUT;
+                            event.data.fd = currentFd;
+                            epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                        }
+                    }
+                }
+            }
+            else if (events[i].events & EPOLLOUT){
+                // Manda o Cliente enviar os próprios dados
+                Client* client = _clients[currentFd];
+                if (client->writeData() == true) {
+                    removeClient(currentFd);
+                }
+            }
+        }
+        checkTimeouts();
+    }
 }
 
-void	Server::serverLoop(){
-	struct pollfd _serverPfd;
-
-	_serverPfd.fd		= _serverFd;
-	_serverPfd.events	= POLLIN;
-	_serverPfd.revents	= 0;
-
-	_fds.push_back(_serverPfd);
-
-	while (true){
-		poll(&_fds[0], _fds.size(), -1);
-		for (size_t i = 0; i < _fds.size(); i++){
-			if (_fds[i].revents & POLLIN){
-				if (_fds[i].fd == _serverFd){
-					handleNewConnection();
-				} else {
-					bool clientDeleted = readFromClient(i);
-					if (clientDeleted == true){
-						--i;
-						continue;
-					}
-				}
-			}
-			if (_fds[i].revents & POLLOUT){
-				writeToClient(i);
-				i--;
-			}
-		}
-	}
+void Server::checkTimeouts() {
+    time_t now = time(NULL);
+    std::map<int, Client*>::iterator it = _clients.begin();
+    
+    while (it != _clients.end()) {
+        Client* client = it->second;
+        
+        if (client->isTimeout(now, 60)) { // 60 segundos
+            std::cout << "[CEIFADOR] Cliente no fd " << it->first << " expulso!" << std::endl;
+            
+            int fdToErase = it->first;
+            ++it;
+            removeClient(fdToErase);
+        } else {
+            ++it;
+        }
+    }
 }

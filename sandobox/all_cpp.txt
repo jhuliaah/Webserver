@@ -1,0 +1,337 @@
+
+/* ==================== ./srcs/CgiRequest.cpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   CgiRequest.cpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
+/*   Updated: 2026/06/20 09:38:56 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../includes/HttpRequest.hpp"
+#include "../includes/HttpResponse.hpp"
+
+
+int main(void)
+{
+	HttpRequest req;
+
+	req.method = "GET";
+	req.uri = "/cgi-bin/hello.py?name=eduardo";
+	req.path = "/cgi-bin/hello.py";
+	req.query_string = "name=eduardo";
+
+	RouteConfig cgi_route;
+	cgi_route.path_prefix = "/cgi-bin/";
+	cgi_route.root = "./www";
+	cgi_route.cgi_extension = ".py";
+	cgi_route.cgi_path = "/usr/bin/python3";
+	cgi_route.is_cgi = true;
+
+	Router router;
+
+	router.add_route(cgi_route);
+
+	RouteConfig matched = router.match(req);
+
+
+
+
+
+
+}
+
+
+
+/* ==================== ./srcs/HttpRequest.cpp ==================== */
+
+// Aqui só um esqueleto, mas tem mais coisa no webserv do Fabio.
+
+#include "HttpRequest.hpp"
+
+HttpRequest::HttpRequest()
+{
+}
+
+HttpRequest::~HttpRequest()
+{
+}
+
+std::string HttpRequest::get_header(const std::string& name) const
+{
+}
+/* ==================== ./srcs/RouteConfig.cpp ==================== */
+
+#include "../include/RouteConfig.hpp"
+
+RouteConfig::RouteConfig()
+{
+}
+
+RouteConfig::~RouteConfig()
+{
+}
+
+/* ==================== ./srcs/server/Socket.cpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Socket.cpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 17:38:28 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/20 19:42:39 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../../includes/WebServer.hpp"
+
+// AF_INET — família de endereços IPv4 (endereços tipo 192.168.0.1)
+// SOCK_STREAM — tipo TCP — conexão confiável, com garantia de entrega e ordem.
+// O HTTP precisa disso.
+// 0 — protocolo automático.
+
+Socket::Socket()
+{
+	_serverFd = socket(AF_INET, SOCK_STREAM, 0);
+	if (_serverFd == -1)
+		throw SocketException(	"ServerFd failed -> "
+								+ std::string(strerror(errno)));
+	SocketConfig();
+	nonBlocking();
+}
+
+int Socket::getFd() const
+{
+	return _serverFd;
+}
+
+
+
+//=========================//
+// Configuraçoes do Socket //
+//=========================//
+
+/* Quando seu servidor para e você tenta reiniciá-lo logo em seguida, o sistema operacional
+	ainda guarda a porta "ocupada" por alguns segundos (estado TIME_WAIT do TCP).
+	Sem SO_REUSEADDR, o bind() falharia com "Address already in use".
+	Com essa opção, o SO libera a porta imediatamente.*/
+
+// O opt é como se fosse um interruptor / 1 ou 0
+	
+void	Socket::SocketConfig()
+{
+	int	opt = 1;
+	if (setsockopt(_serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) == -1)
+		throw SocketException("Configuration failed -> " + std::string(strerror(errno)));
+}
+
+/*Por padrão, operações de rede bloqueiam — ou seja, se você chamar recv()
+e não tiver dados ainda, o programa para e fica esperando. Para um servidor que
+atende múltiplos clientes, isso é catastrófico.*/
+
+/*recv() sem dados disponíveis → retorna -1 imediatamente (errno = EWOULDBLOCK)
+									em vez de ficar travado esperando*/
+	
+void	Socket::nonBlocking(){
+	if (fcntl(_serverFd, F_SETFL, O_NONBLOCK) == -1)
+		throw SocketException("NonBlocking failed -> " + std::string(strerror(errno)));
+}
+/* ==================== ./srcs/server/Server.cpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   Server.cpp                                         :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/06/20 20:21:14 by eduribei         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../../includes/WebServer.hpp"
+
+void	Server::initServer()
+{
+	struct sockaddr_in	address;
+	int					socketFd;
+
+	std::memset(&address, 0, sizeof(address));
+	/* Zeramos a sockaddr_in para evitar valores aleatórios nos campos que
+	não preenchemos. Essa struct será enviada via bind() para processamento
+	pelo kernel, cuja implementação não controlamos e pode variar de sistema
+	para sistema. Assim, a struct sempre começa no mesmo estado, o que deixa
+	o comportamento mais previsível e facilita encontrar bugs. */
+
+	address.sin_family		= AF_INET; 				// usando IPv4
+	address.sin_port		= htons(WEBSERV_PORT);	// htons ajusta endianess
+	address.sin_addr.s_addr	= INADDR_ANY;			// qualquer ip é aceito
+
+	socketFd = _socket.getFd();
+
+	//bind() -> este socket vai receber conexoes na porta 8080
+	if (bind(socketFd, (struct sockaddr*)&address, sizeof(address)) == -1)
+	{
+		throw ServerException(std::string("bind() system call failed -> ")
+		+ strerror(errno));
+	}
+	if (listen(socketFd, SOMAXCONN) == -1)
+	{
+		throw ServerException(std::string("listen() system call failed -> ")
+		+ strerror(errno));
+	}
+}
+
+void	Server::handleNewConnection()
+{
+	struct sockaddr_in	clientAddr;
+	socklen_t			clientLen;
+	int					socketFd;
+
+	socketFd = _socket.getFd();
+	clientLen = sizeof(clientAddr);
+	std::memset(&clientAddr, 0, sizeof(sockaddr_in));
+
+	int clientFd = accept(socketFd, (struct sockaddr*)&clientAddr, &clientLen);
+	if (clientFd == -1)
+		return;
+
+	fcntl(clientFd, F_SETFL, O_NONBLOCK);
+
+	t_pollfd clientPdf;
+	clientPdf.fd = clientFd;
+	clientPdf.events = POLLIN;
+	clientPdf.revents = 0;
+
+	_fds.push_back(clientPdf);
+	std::cout << "New client connected on fd: " << clientFd << std::endl;
+}
+
+void	Server::writeToClient(size_t index)
+{
+	int fd = _fds[index].fd;
+	std::string response = _clientResponses[fd];
+
+	send(fd, response.c_str(), response.size(), 0);
+	close(fd);
+
+	_clientResponses.erase(fd);
+	_fds.erase(_fds.begin() + index);
+}
+
+bool	Server::readFromClient(size_t index)
+{
+	char buffer[4096];
+	std::memset(buffer, 0, sizeof(buffer));
+
+	int bytes = recv(_fds[index].fd, buffer, sizeof(buffer) - 1, 0);
+
+	if (bytes > 0)
+	{
+		std::string response = "HTTP/1.0 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 6\r\n\r\nShrek!";
+		_clientResponses[_fds[index].fd] = response;
+		_fds[index].events = POLLOUT;
+		return false;
+	}
+	else {
+		std::cout << "Client disconnected on fd: " << _fds[index].fd << std::endl;
+		
+		close(_fds[index].fd);
+		_fds.erase(_fds.begin() + index);
+		return true;
+	}
+}
+
+void	Server::serverLoop()
+{
+	t_pollfd _serverPfd;
+
+	_serverPfd.fd		= _socket.getFd();
+	_serverPfd.events	= POLLIN;
+	_serverPfd.revents	= 0;
+
+	_fds.push_back(_serverPfd);
+
+	while (true)
+	{
+		poll(&_fds[0], _fds.size(), -1);
+		for (size_t i = 0; i < _fds.size(); i++)
+		{
+			if (_fds[i].revents & POLLIN)
+			{
+				if (_fds[i].fd == _socket.getFd())
+					handleNewConnection();
+				else				
+					if (readFromClient(i))
+						{ --i; continue; }
+			}
+			if (_fds[i].revents & POLLOUT)
+				{ writeToClient(i); i--; }
+		}
+	}
+}
+
+/* ==================== ./srcs/HttpResponse.cpp ==================== */
+
+#include "../include/HttpResponse.hpp"
+#include <sstream>
+
+HttpResponse::HttpResponse()
+{
+}
+
+HttpResponse::~HttpResponse()
+{
+}
+
+
+/* ==================== ./srcs/main.cpp ==================== */
+
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   main.cpp                                           :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/05/26 15:32:55 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/05/28 14:40:46 by ratanaka         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
+#include "../includes/WebServer.hpp"
+
+int main(int argc, char* argv[])
+{
+	if (argc != 2)
+	{
+		std::cout << "EX{./webserv <config_file>}" << std::endl;
+		return 1;
+	}
+
+	(void)argv;
+	
+	try
+	{
+		Server server; // Cria a instância (chama o construtor do Socket implicitamente)
+		server.initServer(); // Configura a sockaddr_in, faz o bind() e o listen()
+		server.serverLoop(); // Inicia o vigia do poll() no loop infinito
+
+	}
+	catch (const std::exception& e)
+	{
+		// Captura SocketException ou ServerException e exibe a mensagem em inglês com o strerror(errno)
+		std::cerr << "FATAL ERROR: " << e.what() << std::endl;
+		return 1; // Termina com código de erro de forma limpa
+	}
+	return 0;
+}
