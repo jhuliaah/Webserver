@@ -18,10 +18,11 @@ class Client;
 
 class Server{
 	private:
+		int							_epollFd;
 		std::vector<Socket*>		_sockets;
 		std::vector<int>			_serverFds;
-		int							_epollFd;
-		std::map<int, Client*>      _clients;
+		std::map<int, Client*>		_clients;
+		std::map<int, Client*>		_cgiPipes;
 
 		void	handleNewConnection(int server_fd);
 		bool	readFromClient(int fd);
@@ -38,4 +39,6 @@ class Server{
 		~Server();
 		void	initServer(std::vector<int> ports);
 		void	serverLoop();
+		
 };
+

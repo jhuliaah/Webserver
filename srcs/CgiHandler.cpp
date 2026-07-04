@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   CgiRequest.cpp                                     :+:      :+:    :+:   */
+/*   CgiHandler.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,37 +10,14 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../include/HttpRequest.hpp"
-#include "../include/HttpResponse.hpp"
+#include "../includes/CgiHandler.hpp"
 
 
-int main(void)
+CgiHandler::CgiHandler()
 {
-	HttpRequest req;
-
-	req.method = "GET";
-	req.uri = "/cgi-bin/hello.py?name=eduardo";
-	req.path = "/cgi-bin/hello.py";
-	req.query_string = "name=eduardo";
-
-	RouteConfig cgi_route;
-	cgi_route.path_prefix = "/cgi-bin/";
-	cgi_route.root = "./www";
-	cgi_route.cgi_extension = ".py";
-	cgi_route.cgi_path = "/usr/bin/python3";
-	cgi_route.is_cgi = true;
-
-	Router router;
-
-	router.add_route(cgi_route);
-
-	RouteConfig matched = router.match(req);
-
-
-
-
-
-
 }
 
+CgiHandler::~CgiHandler()
+{
+}
 

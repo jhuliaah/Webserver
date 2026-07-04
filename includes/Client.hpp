@@ -16,18 +16,28 @@
 
 class Client {
 	public:
-		enum State {READING, WRITING, CLOSED};
+		enum State {READING, WRITING, CGI_RUNNING, CLOSED};
+		struct CgiContext {
+			pid_t		pid;
+			int			stdin_fd;
+			int			stdout_fd;
+			std::string outputBuffer;
+			size_t		inputSent;
+			time_t		startTime;
+		} _cgiContext; // copiei CgiContext de vados-sa
+
+
 
 	private:
 		int			_fd;
 		time_t		_lastActivity;
 		std::string	_rawRequest;
 		std::string	_response;
-		State		_state;
+		State		_state_e;	//lembranças do norminette: typedef = _t, struct = _s, enum = _e
 
 		std::string _buildStaticResponse();
-	public:
 
+	public:
 		Client(int fd);
 		~Client();
 
@@ -36,5 +46,7 @@ class Client {
 		bool isTimeout(time_t currentTime, int timeoutLimit);
 
 		int		getFd() const { return _fd; }
-		State	getState() const { return _state; }
+		State	getState() const { return _state_e; }
+
+
 };

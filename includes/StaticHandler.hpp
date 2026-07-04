@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   CgiRequest.hpp                                     :+:      :+:    :+:   */
+/*   StaticHandler.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,22 +10,21 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef CGI_REQUEST_HPP
-# define CGI_REQUEST_HPP
+#ifndef STATIC_HANDLER_HPP
+# define STATIC_HANDLER_HPP
 
 # include <string>
+# include "IRequestHandler.hpp"
 
-class CgiRequest
+class StaticHandler : public IRequestHandler
 {
 	private:
 		std::string _method;
 
 
 	public:
-		CgiRequest();
-		~CgiRequest();
-
-		const std::string&  getMethod() const;
+		StaticHandler();
+		~StaticHandler();
 
 };
 
