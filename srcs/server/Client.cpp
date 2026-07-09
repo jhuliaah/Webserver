@@ -10,11 +10,18 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/WebServer.hpp"
+#include "../../includes/Client.hpp"
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+// #include <cstdlib>
+#include <sys/socket.h>		
 
 /*Rafael, não sei onde, mas seu client em algum momento vai precisar checar 
-o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client. */
-
+o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client.*/
 
 Client::Client(int fd) : _fd(fd), _state_e(READING) {
     _lastActivity = time(NULL);

@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   CgiRequest.cpp                                     :+:      :+:    :+:   */
+/*  StaticHandler.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,7 +10,17 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/CgiRequest.hpp"
+#include "../../includes/StaticHandler.hpp"
+
+
+StaticHandler::StaticHandler()
+{
+}
+
+StaticHandler::~StaticHandler()
+{
+}
+
 
 
 

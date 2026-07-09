@@ -12,4 +12,6 @@ HttpRequest::~HttpRequest()
 
 std::string HttpRequest::get_header(const std::string& name) const
 {
+    (void)name;
+    return "";
 }

@@ -10,9 +10,13 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef CLIENT_HPP
+#define CLIENT_HPP
 
-#include "WebServer.hpp"
+#include <string>
+#include <cstddef>
+#include <ctime>
+#include <sys/types.h>
 
 class Client {
 	public:
@@ -26,14 +30,13 @@ class Client {
 			time_t		startTime;
 		} _cgiContext; // copiei CgiContext de vados-sa
 
-
-
 	private:
 		int			_fd;
 		time_t		_lastActivity;
 		std::string	_rawRequest;
 		std::string	_response;
-		State		_state_e;	//lembranças do norminette: typedef = _t, struct = _s, enum = _e
+		State		_state_e;
+		//lembranças do norminette: typedef = _t, struct = _s, enum = _e
 
 		std::string _buildStaticResponse();
 
@@ -50,3 +53,8 @@ class Client {
 
 
 };
+
+#endif
+
+
+

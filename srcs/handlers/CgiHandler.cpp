@@ -10,14 +10,41 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../includes/CgiHandler.hpp"
+#include "../../includes/CgiHandler.hpp"
 
 
-CgiHandler::CgiHandler()
+CgiHandler::CgiHandler() {}
+
+CgiHandler::~CgiHandler() {}
+
+const std::string& CgiHandler::getMethod() const
 {
+    /* TODO */
+    return _method; /* TODO */
 }
 
-CgiHandler::~CgiHandler()
+char **CgiHandler::CgiEnvBuilder()
 {
+    /* TODO */
+    return NULL; /* TODO */
 }
 
+void CgiHandler::parseCgiOutput(const std::string& buffer, HttpResponse& response)
+{
+    (void)buffer;
+    (void)response;
+    
+    /* TODO */
+    /*  essa funçao vai tratar a saida do CGI e preencher o objeto HttpResponse 
+        que vive dentro do objeto Client, que o giHandler::handle() recebeu. */
+}
+
+bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client)
+{
+    /* TODO */
+    (void)req;
+    (void)loc;
+    (void)client;
+
+    return false;     /* Já sei que vai ser false... */
+}

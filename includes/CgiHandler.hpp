@@ -26,16 +26,12 @@ class CgiHandler : public IRequestHandler
 		CgiHandler();
 		~CgiHandler();
 
+		const std::string& getMethod() const;
 
-		const std::string&	getMethod() const;
-	
-		char				**CgiEnvBuilder(); //WIP, adicionar argumentos
-		void				parseCgiOutput(	const std::string& buffer,
-											HttpResponse& response);
-		bool				handle(	const HttpRequest& req,
-									const LocationConfig& loc,
-									Client& client);
+		char	**CgiEnvBuilder(); //WIP, adicionar argumentos
+		void	parseCgiOutput(	const std::string& buffer, HttpResponse& response);
+		bool	handle(const HttpRequest& req, const LocationConfig& loc, Client& client);
 
-										};
+};
 
 #endif

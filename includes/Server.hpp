@@ -10,11 +10,16 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef SERVER_HPP
+#define SERVER_HPP
 
-# include "WebServer.hpp"
+#include <vector>
+#include <map>
+#include <string>
 
-class Client;
+#include "Socket.hpp"
+#include "Client.hpp"
+#include "Config.hpp"
 
 class Server{
 	private:
@@ -23,6 +28,10 @@ class Server{
 		std::vector<int>			_serverFds;
 		std::map<int, Client*>		_clients;
 		std::map<int, Client*>		_cgiPipes;
+		Config						_config;
+
+
+
 
 		void	handleNewConnection(int server_fd);
 		bool	readFromClient(int fd);
@@ -32,13 +41,14 @@ class Server{
 
 		void removeClient(int fd);
 
+		Server();
 		std::string _buildStaticResponse();
 
 	public:
-		Server();
+		Server(Config config);
 		~Server();
-		void	initServer(std::vector<int> ports);
+		void	initServer();
 		void	serverLoop();
-		
 };
 
+#endif
