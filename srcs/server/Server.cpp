@@ -10,16 +10,62 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/WebServer.hpp"
+#include "../../includes/Server.hpp"
+#include "../../includes/Router.hpp"
+#include "../../includes/Exeptions.hpp"
+
+#include <arpa/inet.h>		// inet_addr
+#include <fcntl.h>			// fcntl, F_SETFL, O_NONBLOCK
+#include <netinet/in.h>		// sockaddr_in, htons
+#include <sys/epoll.h>		// epoll_create, epoll_ctl, epoll_wait, EPOLLIN/OUT
+#include <sys/socket.h>		// bind, listen, accept, socklen_t
+#include <unistd.h>			// close
+
+#include <cerrno>			// errno
+#include <cstring>			// strerror, memset
+#include <ctime>			// time, time_t
+#include <iostream>			// cout, endl
+
+/* 
+O Router vai ser usado MAIS OU MENOS assim em Server.cpp, como utility class:
+LocationConfig loc = Router::matchLoc(ServerConfig, uri);
+RouteType type = Router::classify(loc, path, method);
+IRequestHandler *handler = makeHandler(type);
+bool done = handler->handle(req, *loc, client);
+delete handler;																*/
+
+//----------------------------mock--------------------------------------------//
+//---------------------------------------------------mock---------------------//
+//-------mock-----------------------------------------------------------------//
+/*
+                                      ▀▀                    
+ ▀▀█▄ ████▄  ▀▀█▄ ▄████  ▀▀█▄ ████▄   ██  ▄█▀▀▀ ▄█▀▀▀ ▄███▄ 
+▄█▀██ ██ ██ ▄█▀██ ██ ██ ▄█▀██ ██ ▀▀   ██  ▀███▄ ▀███▄ ██ ██ 
+▀█▄██ ████▀ ▀█▄██ ▀████ ▀█▄██ ██      ██▄ ▄▄▄█▀ ▄▄▄█▀ ▀███▀  ler abaixo
+      ██             ██                                     
+      ▀▀           ▀▀▀                                                        */
+
+std::vector<int> _MOCK_ports; // PARA MOOOOOCK!!!!
+
+void CREATE_FAKE_PORTS(std::vector<int> &ports) {
+    ports.push_back(8080);
+    ports.push_back(8085);
+    ports.push_back(9005);
+};
+
+//-----mock-------------------------------------------------------------------//
+//----------------------------mock--------------------------------------------//
+//--------------------------------------------------------mock----------------//
 
 //================================
 //			Constructors		//
 //================================
 
-Server::Server() {
-	_epollFd = epoll_create(10);
-	if (_epollFd == -1)
-		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
+Server::Server(Config config)
+{
+	_epollFd = -1;
+    _config = config;
+    /*vamos guardar uma cópia de config? Acho que sim, mas nao tenho certeza */
 }
 
 Server::~Server() {
@@ -42,15 +88,49 @@ bool Server::isServerFd(int fd) {
 //			Functions			//
 //================================
 
-void	Server::initServer(std::vector<int> ports){
-	for (size_t i = 0; i < ports.size(); i++){
+void	Server::initServer() {
+
+/*
+██████   █████  ███████  █████  ███████ ██      
+██   ██ ██   ██ ██      ██   ██ ██      ██      
+██████  ███████ █████   ███████ █████   ██      
+██   ██ ██   ██ ██      ██   ██ ██      ██         
+██   ██ ██   ██ ██      ██   ██ ███████ ███████
+                                                   
+                                           
+▄▄                                         
+██       ▀▀                            ▀▀  
+██ ▄█▀█▄ ██   ▀▀█▄    ▀▀█▄ ▄████ ██ ██ ██  
+██ ██▄█▀ ██  ▄█▀██   ▄█▀██ ██ ██ ██ ██ ██  
+██ ▀█▄▄▄ ██▄ ▀█▄██   ▀█▄██ ▀████ ▀██▀█ ██▄ 
+                              ██           
+                              ▀▀           
+@Zephele Como você estava usando os fake ports, eu mantive eles aqui para não
+quebrar o seu coódigo. Mas veja que na main.cpp e em Config.cpp eu já estou
+criando um objeto de config com valores mockados.
+
+A primeira coisa que você precisa fazer agora é parar de usar os fake ports
+e passar a usar o objeto de config que vem da main.cpp. Não faço ideia do
+que precisa mudar no seu código, dá essa força aí.                             
+*/
+
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    CREATE_FAKE_PORTS(_MOCK_ports); // PARA MOOOOOCK!!!!
+    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+    _epollFd = epoll_create(10);
+	if (_epollFd == -1)
+		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
+
+	for (size_t i = 0; i < _MOCK_ports.size(); i++){
 		Socket*	newSocket = new Socket();
 		int		fd = newSocket->getFd();
 	
 		struct	sockaddr_in address;
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family		= AF_INET; // usando IPv4
-		address.sin_port		= htons(ports[i]); // htons é um tradutor (portavai ser 8080)
+		address.sin_port		= htons(_MOCK_ports[i]); // htons é um tradutor (portavai ser 8080)
 		address.sin_addr.s_addr	= inet_addr("127.0.0.1"); //por enquanto só vai aceitar conexões do localhost, mas futuramente vamos aceitar de qualquer lugar (INADDR_ANY)
 	
 		//bind() -> este socket vai receber conexoes na porta 8080
@@ -68,7 +148,7 @@ void	Server::initServer(std::vector<int> ports){
 		if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, fd, &event) == -1)
 			throw ServerException(std::string("epoll_ctl failed -> ") + strerror(errno));
 
-		std::cout << "Server listening on port " << ports[i] << " (fd: " << fd << ")" << std::endl;
+		std::cout << "Server listening on port " << _MOCK_ports[i] << " (fd: " << fd << ")" << std::endl;
 	}
 }
 
@@ -162,3 +242,4 @@ void Server::checkTimeouts() {
         }
     }
 }
+

@@ -10,9 +10,11 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef EXEPTIONS_HPP
+#define EXEPTIONS_HPP
 
-# include "WebServer.hpp"
+#include <exception>
+#include <string>
 
 class ServerException : public std::exception {
 	private :
@@ -31,3 +33,5 @@ class SocketException : public std::exception {
 		virtual ~SocketException() throw() {}
 		virtual const char* what() const throw() { return _msg.c_str(); }
 };
+
+#endif

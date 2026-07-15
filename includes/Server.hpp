@@ -10,18 +10,28 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef SERVER_HPP
+#define SERVER_HPP
 
-# include "WebServer.hpp"
+#include <vector>
+#include <map>
+#include <string>
 
-class Client;
+#include "Socket.hpp"
+#include "Client.hpp"
+#include "Config.hpp"
 
 class Server{
 	private:
+		int							_epollFd;
 		std::vector<Socket*>		_sockets;
 		std::vector<int>			_serverFds;
-		int							_epollFd;
-		std::map<int, Client*>      _clients;
+		std::map<int, Client*>		_clients;
+		std::map<int, Client*>		_cgiPipes;
+		Config						_config;
+
+
+
 
 		void	handleNewConnection(int server_fd);
 		bool	readFromClient(int fd);
@@ -31,11 +41,14 @@ class Server{
 
 		void removeClient(int fd);
 
+		Server();				// virou private, so cria server com config.
 		std::string _buildStaticResponse();
 
 	public:
-		Server();
+		Server(Config config);
 		~Server();
-		void	initServer(std::vector<int> ports);
+		void	initServer(); // os fake ports mudaram de lugar.
 		void	serverLoop();
 };
+
+#endif

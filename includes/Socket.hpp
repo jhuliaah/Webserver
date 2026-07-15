@@ -10,9 +10,13 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#pragma once
+#ifndef SOCKET_HPP
+#define SOCKET_HPP
 
-# include "WebServer.hpp"
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <cerrno>
+#include <cstring>
 
 class Socket{
 	protected :
@@ -24,3 +28,5 @@ class Socket{
 		void	nonBlocking();
 		int		getFd() const {return _serverFd;};
 };
+
+#endif
