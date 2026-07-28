@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:24:50 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:23:03 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/21 19:09:00 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -86,14 +86,17 @@ bool Client::readData() {
 }
 
 bool Client::writeData() {
-    //Pegamos a bandeja (_response) e atiramos pelo tubo do Socket (_fd)
-    int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
-    
-    if (bytesSent > 0) {
-        _state_e = CLOSED; // No HTTP/1.1 básico, terminamos e fechamos.
-        return true; // Retorna true avisando o Server que pode matá-lo
-    }
-    
+
+	if (!_response.empty()) {
+		int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
+		if (bytesSent > 0) {
+            std::cout << "-> Resposta enviada para o fd " << _fd << "!" << std::endl;
+		}
+		_response.clear();
+        _state_e = CLOSED;
+		return true;
+	}
+
     _state_e = CLOSED;
-    return true; // Erro no envio
+    return true;
 }

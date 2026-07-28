@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 12:37:13 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/21 17:44:20 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,8 +18,9 @@
 #include <string>
 
 #include "Socket.hpp"
-#include "Client.hpp"
 #include "Config.hpp"
+
+class Client;
 
 class Server{
 	private:
@@ -34,15 +35,13 @@ class Server{
 
 
 		void	handleNewConnection(int server_fd);
-		bool	readFromClient(int fd);
-		void	writeToClient(int fd);
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
+		void	handleCgiRead(int pipeFd);
 
 		void removeClient(int fd);
 
 		Server();				// virou private, so cria server com config.
-		std::string _buildStaticResponse();
 
 	public:
 		Server(Config config);

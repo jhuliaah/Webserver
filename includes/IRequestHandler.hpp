@@ -6,7 +6,8 @@
 #include "HttpRequest.hpp"
 #include "HttpResponse.hpp"
 #include "LocationConfig.hpp"
-#include "Client.hpp"
+
+class Client;
 
 class IRequestHandler
 {
