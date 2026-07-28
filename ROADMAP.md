@@ -19,6 +19,17 @@ what's next.
   match the shape of a real nginx-style config file
 - **Mock config generation** — hardcoded test configs for local dev
   (temporary, to be replaced by real parsing)
+- **CGI process spawning** — `CgiHandler::handle()` builds the env
+  (`REQUEST_METHOD`, `SERVER_PROTOCOL`, `PATH_INFO`, `QUERY_STRING`,
+  `CONTENT_LENGTH`, `CONTENT_TYPE`), sets up stdin/stdout pipes, forks and
+  `execve`s the script without blocking the event loop
+- **CGI event loop integration** — the CGI stdout pipe is registered with
+  `epoll`; `Server::handleCgiRead()` reads script output asynchronously and
+  switches the client to `WRITING` once the script exits
+- **CGI timeout handling** — a script stuck for more than 5s is `SIGKILL`ed
+  and the client gets a `504 Gateway Timeout`
+- **CGI process cleanup** — both `removeClient()` and the timeout path kill
+  the child, close its pipe, and remove it from `_cgiPipes` so nothing leaks
 
 ## ⚠️ Done but needs fixing
 
@@ -32,10 +43,15 @@ what's next.
 - **Server shutdown** — doesn't close/free connected clients, only sockets
 - **`StaticHandler`** — exists but never implements `handle()`, so it's
   still an abstract class and can't be used yet
-- **`CgiHandler`** — all methods present but stubbed out (`handle()`
-  always returns `false`)
-- **`HttpRequest`** — data class exists, but header lookup is a stub and
-  it's never actually populated from a real request
+- **`CgiHandler`** — pipes/fork/`execve` work end-to-end, but only for a
+  single hardcoded script (`cgi-bin/script1.py`); `parseCgiOutput()` is
+  still a stub, so the raw script output is sent straight through as the
+  response instead of being parsed into a real `HttpResponse`; the request
+  body is never written to the script's stdin, so POST bodies aren't
+  forwarded
+- **`HttpRequest`** — now a proper encapsulated class with getters/setters
+  and a working `getHeader()` lookup, but nothing populates it from a real
+  parsed request yet (request parsing itself hasn't started)
 - **Config file parser** — a first attempt exists but doesn't compile;
   needs a rewrite
 - **`Router`** — matching/classification methods are declared but not
@@ -51,7 +67,6 @@ what's next.
 - Custom error pages (403/404/405/413/500)
 - Request body size limit enforcement
 - File uploads
-- CGI script execution
 - Keep-alive connections
 - Redirects
 
@@ -90,8 +105,17 @@ parsing → config → routing/static files → uploads/limits → CGI → polis
 - [ ] Implement file upload/delete handling
 
 ### Phase 5 — CGI
-- [ ] Implement CGI script execution (spawn process, pass request data,
-      capture output, handle timeouts)
+- [x] Spawn CGI process and pass request data via environment variables
+- [x] Capture CGI output asynchronously through the `epoll` loop
+- [x] Handle CGI timeouts (kill + 504 on hang)
+- [ ] Forward the request body to the CGI script's stdin (POST support)
+- [ ] Parse raw CGI output into a proper `HttpResponse` (status line,
+      headers, body) instead of passing it through raw
+- [ ] Select the CGI script dynamically via routing/config instead of the
+      hardcoded `cgi-bin/script1.py` path
+- [ ] Wire CGI dispatch into the real request flow — it currently runs
+      through a temporary hardcoded trigger in `Server::serverLoop`, not
+      through `Router`
 
 ### Phase 6 — Polish
 - [ ] Decide on and implement keep-alive vs close-per-request
