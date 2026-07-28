@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   CgiHandler.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
+/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
-/*   Updated: 2026/06/13 18:20:17 by eduribei         ###   ########.fr       */
+/*   Updated: 2026/07/28 16:58:28 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,7 @@ class CgiHandler : public IRequestHandler
 
 		const std::string& getMethod() const;
 
-		char	**CgiEnvBuilder(); //WIP, adicionar argumentos
+		char	**CgiEnvBuilder(const HttpRequest& req);
 		void	parseCgiOutput(	const std::string& buffer, HttpResponse& response);
 		bool	handle(const HttpRequest& req, const LocationConfig& loc, Client& client);
 
