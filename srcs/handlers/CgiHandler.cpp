@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/23 16:34:30 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/28 17:26:12 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,10 +27,32 @@ const std::string& CgiHandler::getMethod() const
     return _method; /* TODO */
 }
 
-char **CgiHandler::CgiEnvBuilder()
+char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 {
-    /* TODO */
-    return NULL; /* TODO */
+	std::vector<std::string> envList;
+
+	envList.push_back("REQUEST_METHOD=" + req.getMethod());
+	envList.push_back("SERVER_PROTOCOL=HTTP/1.1");
+	envList.push_back("PATH_INFO=" + req.getUri());
+	envList.push_back("QUERY_STRING=" + req.getQueryString());
+
+	std::string contentLength = req.getHeader("Content-Length");
+	if (!contentLength.empty()) {
+		envList.push_back("CONTENT_LENGTH=" + contentLength);
+	}
+	
+	std::string contentType = req.getHeader("Content-Type");
+	if (!contentType.empty()) {
+		envList.push_back("CONTENT_TYPE=" + contentType);
+	}
+	
+	char** envp = new char*[envList.size() + 1];
+	for (size_t i = 0; i < envList.size(); ++i){
+		envp[i] = new char[envList[i].size() + 1];
+		std::strcpy(envp[i], envList[i].c_str());
+	}
+	envp[envList.size()] = NULL;
+	return envp;
 }
 
 void CgiHandler::parseCgiOutput(const std::string& buffer, HttpResponse& response)
@@ -73,8 +95,8 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		char* scriptPath = (char*)"/usr/bin/python3";
 		char* scriptName = (char*)"./cgi-bin/script1.py";
 		char* argv[] = { scriptPath, scriptName, NULL};
-		extern char **environ;
-		execve(argv[0], argv, environ);
+		char** envp = CgiEnvBuilder(req);
+		execve(argv[0], argv, envp);
 		std::cerr << "CGI falhou no execve" << std::endl;
 		std::exit(1);
 	}
