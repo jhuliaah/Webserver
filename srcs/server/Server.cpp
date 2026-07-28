@@ -6,11 +6,12 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:29:14 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/23 16:25:54 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/Server.hpp"
+#include "../../includes/Client.hpp"
 #include "../../includes/Router.hpp"
 #include "../../includes/Exeptions.hpp"
 
@@ -25,6 +26,7 @@
 #include <cstring>			// strerror, memset
 #include <ctime>			// time, time_t
 #include <iostream>			// cout, endl
+#include <signal.h>
 
 /* 
 O Router vai ser usado MAIS OU MENOS assim em Server.cpp, como utility class:
@@ -61,12 +63,7 @@ void CREATE_FAKE_PORTS(std::vector<int> &ports) {
 //			Constructors		//
 //================================
 
-Server::Server(Config config)
-{
-	_epollFd = -1;
-    _config = config;
-    /*vamos guardar uma cópia de config? Acho que sim, mas nao tenho certeza */
-}
+Server::Server(Config config) : _epollFd(-1), _config(config) {}
 
 Server::~Server() {
 	for (size_t i = 0; i < _sockets.size(); i++){
@@ -174,9 +171,25 @@ void Server::handleNewConnection(int serverFd){
 }
 
 void Server::removeClient(int fd) {
+	if (_clients.find(fd) == _clients.end()) return;
+
+	Client* client = _clients[fd];
+	if (client->getCgiContext().pid != -1 || client->getCgiContext().stdout_fd != -1){
+		int pipeFd = client->getCgiContext().stdout_fd;
+		if (pipeFd != -1) {
+			epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+			close(pipeFd);
+			_cgiPipes.erase(pipeFd);
+		}
+		if (client->getCgiContext().pid != -1) {
+			kill(client->getCgiContext().pid, SIGKILL);
+			waitpid(client->getCgiContext().pid, NULL, WNOHANG);
+		}
+	}
+
     epoll_ctl(_epollFd, EPOLL_CTL_DEL, fd, NULL);
     close(fd);
-    delete _clients[fd];
+    delete client;
     _clients.erase(fd);
 }
 
@@ -191,26 +204,61 @@ void Server::serverLoop(){
         for (int i = 0; i < numEvents; i++){
             int currentFd = events[i].data.fd;
 
-            if (events[i].events & EPOLLIN){
-                if (isServerFd(currentFd)){
-                    handleNewConnection(currentFd);
-                } else {
-                    // Manda o Cliente ler os próprios dados
-                    Client* client = _clients[currentFd];
+            if (isServerFd(currentFd) && (events[i].events & EPOLLIN)){
+                handleNewConnection(currentFd);
+            }
+            else if (_cgiPipes.count(currentFd) && (events[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR))){
+                handleCgiRead(currentFd);
+            } else if (events[i].events & EPOLLIN) {
+					Client* client = _clients[currentFd];
                     if (client->readData() == true) {
                         
                         if (client->getState() == Client::CLOSED) {
                             removeClient(currentFd);
                         } 
-                        else if (client->getState() == Client::WRITING) {
-                            // O Cliente terminou de ler, muda para EPOLLOUT
-                            struct epoll_event event;
-                            event.events = EPOLLOUT;
-                            event.data.fd = currentFd;
-                            epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                        else {
+                            // -----------------------------------------------------------
+                            // GATILHO TEMPORÁRIO PARA TESTAR A PONTE DO CGI DO RAFAEL
+                            // -----------------------------------------------------------
+                            CgiHandler cgi;
+                            LocationConfig locMock;
+                            
+                            // Dispara o fork/pipe. Se retornar false, o script está a rodar
+                            if (cgi.handle(client->getRequest(), locMock, *client) == false) {
+                                int pipeFd = client->getCgiContext().stdout_fd;
+                                
+                                // Vincula o número do tubo ao objeto do cliente
+                                _cgiPipes[pipeFd] = client;
+                                
+                                // Regista o tubo no epoll para monitorizar LEITURA (EPOLLIN)
+                                struct epoll_event ev;
+                                ev.events = EPOLLIN | EPOLLHUP | EPOLLERR;
+                                ev.data.fd = pipeFd;
+                                epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeFd, &ev);
+                            } else {
+                                // Caso síncrono (estático comum) mudaria para EPOLLOUT
+                                struct epoll_event event;
+                                event.events = EPOLLOUT;
+                                event.data.fd = currentFd;
+                                epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                            }
                         }
                     }
-                }
+                    // // Manda o Cliente ler os próprios dados
+                    // Client* client = _clients[currentFd];
+                    // if (client->readData() == true) {
+                        
+                    //     if (client->getState() == Client::CLOSED) {
+                    //         removeClient(currentFd);
+                    //     } 
+                    //     else if (client->getState() == Client::WRITING) {
+                    //         // O Cliente terminou de ler, muda para EPOLLOUT
+                    //         struct epoll_event event;
+                    //         event.events = EPOLLOUT;
+                    //         event.data.fd = currentFd;
+                    //         epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                    //     }
+                    // }
             }
             else if (events[i].events & EPOLLOUT){
                 // Manda o Cliente enviar os próprios dados
@@ -230,8 +278,35 @@ void Server::checkTimeouts() {
     
     while (it != _clients.end()) {
         Client* client = it->second;
+		int clientFd = it->first;
         
-        if (client->isTimeout(now, 60)) { // 60 segundos
+		if (client->getState() == Client::CGI_RUNNING) {
+			if (now - client->getCgiContext().startTime > 5) {
+				std::cout << "[TIMEOUT 504] CGI Script no fd " << clientFd << " travou. Matando processo!" << std::endl;
+				if (client->getCgiContext().pid != -1){
+					kill(client->getCgiContext().pid, SIGKILL);
+				}
+
+				int pipeFd = client->getCgiContext().stdout_fd;
+				if (pipeFd != -1) {
+					epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+					close(pipeFd);
+					_cgiPipes.erase(pipeFd);
+					client->getCgiContext().stdout_fd = -1;
+				}
+				
+				std::string error504 = "HTTP/1.1 504 Gateway Timeout\r\nContent-Type: text/html\r\nContent-Length: 47\r\n\r\n<html><body><h1>504 Gateway Timeout</h1></body></html>";
+				client->setResponse(error504);
+				client->setState(Client::WRITING);
+
+				struct epoll_event event;
+				event.events = EPOLLOUT;
+				event.data.fd = clientFd;
+				epoll_ctl(_epollFd, EPOLL_CTL_MOD, clientFd, &event);
+			}
+			++it;
+		}
+        else if (client->isTimeout(now, 60)) { // 60 segundos
             std::cout << "[CEIFADOR] Cliente no fd " << it->first << " expulso!" << std::endl;
             
             int fdToErase = it->first;
@@ -243,3 +318,40 @@ void Server::checkTimeouts() {
     }
 }
 
+void Server::handleCgiRead(int pipeFd){
+	Client*	client = _cgiPipes[pipeFd];
+	char	buffer[4096];
+
+	std::memset(buffer, 0, sizeof(buffer));
+	int		bytesRead = read(pipeFd, buffer, sizeof(buffer) -1);
+
+	if (bytesRead > 0) {
+		client->getCgiContext().outputBuffer.append(buffer, bytesRead);
+		std::cout << "[cgi] Lidos " << bytesRead << " bytes do script Python" << std::endl;
+	}
+	else if (bytesRead == 0) {
+		std::cout << "[cgi] Python encerrou a execucao. Montando resposta final..." << std::endl;
+		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+		close(pipeFd);
+		_cgiPipes.erase(pipeFd);
+
+		client->setResponse(client->getCgiContext().outputBuffer);
+		client->setState(Client::WRITING);
+		
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = client->getFd();
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
+		
+		waitpid(client->getCgiContext().pid, NULL, WNOHANG);
+		client->getCgiContext().pid = -1;
+		client->getCgiContext().stdout_fd = -1;
+	}
+	else {
+		// epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+		// close(pipeFd);
+		// _cgiPipes.erase(pipeFd);
+		// removeClient(client->getFd());
+		return ;
+	}
+}
