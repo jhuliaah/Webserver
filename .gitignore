@@ -39,3 +39,6 @@
 
 # debug information files
 *.dwo
+
+# Local working notes (not shared with the team)
+PROJECT_STATUS.md
