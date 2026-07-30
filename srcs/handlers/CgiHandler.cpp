@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/28 17:26:12 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/28 17:45:17 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -104,16 +104,23 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 	else {
 		close(pipe_in[0]);
 		close(pipe_out[1]);
-		close(pipe_in[1]);
-		// fcntl(pipe_in[1], F_SETFL, O_NONBLOCK);
+
 		fcntl(pipe_out[0], F_SETFL, O_NONBLOCK);
 
 		Client::CgiContext& cgi = client.getCgiContext();
 		cgi.pid = pid;
-		cgi.stdin_fd = pipe_in[1];
 		cgi.stdout_fd = pipe_out[0];
 		cgi.startTime = time(NULL);
+		cgi.inputSent = 0;
 		
+		if (req.getMethod() == "POST") {
+			fcntl(pipe_in[1], F_SETFL, O_NONBLOCK);
+			cgi.stdin_fd = pipe_in[1];
+		} else {
+			close(pipe_in[1]);
+			cgi.stdin_fd = -1;
+		}
+
 		client.setState(Client::CGI_RUNNING);
 		std::cout << "[CGI] Disparado! PID: " << pid << " | FD Tubo: " << cgi.stdout_fd << std::endl;
 		return false;

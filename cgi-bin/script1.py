@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
+import sys
 
-# 1. Preparamos o corpo da página
-body = "<html><body><h1>Fala, epoll! CGI em Alta Velocidade!</h1></body></html>\n"
+# O sys.stdin.read() vai "chupar" o tubo até o C++ fazer close(stdin_fd)
+body_recebido = sys.stdin.read()
 
-# 2. Imprimimos o cabeçalho HTTP completo (COM Content-Length!)
-print(f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(body)}\r\n\r\n", end="")
+html = f"<html><body><h1>Sucesso absoluto! C++ disse: '{body_recebido}'</h1></body></html>\n"
 
-# 3. Imprimimos o corpo
-print(body, end="")
+print(f"HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: {len(html)}\r\n\r\n{html}", end="")

@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/07/21 17:44:20 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/28 17:46:16 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,7 @@ class Server{
 		std::vector<int>			_serverFds;
 		std::map<int, Client*>		_clients;
 		std::map<int, Client*>		_cgiPipes;
+		std::map<int, Client*>		_cgiWritePipes;
 		Config						_config;
 
 
@@ -38,6 +39,7 @@ class Server{
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
 		void	handleCgiRead(int pipeFd);
+		void	handleCgiWrite(int pipeFd);
 
 		void removeClient(int fd);
 
