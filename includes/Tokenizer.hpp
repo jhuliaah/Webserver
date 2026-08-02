@@ -19,4 +19,4 @@ class Tokenizer
         Tokenizer &operator=(const Tokenizer &other);
 };
 
-endif;
+#endif

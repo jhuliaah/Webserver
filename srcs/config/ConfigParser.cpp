@@ -1,6 +1,7 @@
 
-#include "../includes/ConfigParser.hpp"
-#include "../includes/Tokenizer.hpp"
+#include "../../includes/ConfigParser.hpp"
+#include "../../includes/Tokenizer.hpp"
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 

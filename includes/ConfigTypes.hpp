@@ -19,8 +19,8 @@ struct location
     bool    autoindex;
     std::map<string, string> cgiExtensions;
 
-    Location()
-        : autoindex(false), uploadEnable(false) {}
+    location()
+        : autoindex(false) {}
 };
 
 struct ServerConfig
@@ -30,10 +30,10 @@ struct ServerConfig
     std::vector<string>     serverName;
     std::map<int, string>   errorPages;
     size_t                  clientMaxBodySize;
-    std::vector<Location>   locations;
+    std::vector<location>   locations;
 
-    serverConfig()
+    ServerConfig()
         : port(0), clientMaxBodySize(1048576) {}
 };
 
-endif;
+#endif

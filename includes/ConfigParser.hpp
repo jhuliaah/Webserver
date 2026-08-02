@@ -31,7 +31,7 @@ class ConfigParser{
         
         public:
         ParseException(const string &msg) : _msg(msg){}
-        virtual ~ParseException() throw {}
+        virtual ~ParseException() throw() {}
         virtual const char *what() const throw() { return _msg.c_str();}
     };
 
