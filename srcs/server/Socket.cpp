@@ -10,7 +10,8 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/WebServer.hpp"
+#include "../../includes/Socket.hpp"
+#include "../../includes/Exeptions.hpp"
 
 //AF_INET — família de endereços IPv4 (endereços tipo 192.168.0.1)
 //SOCK_STREAM — tipo TCP — conexão confiável, com garantia de entrega e ordem. O HTTP precisa disso.

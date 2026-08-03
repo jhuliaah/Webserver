@@ -6,13 +6,23 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:24:50 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:23:03 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/07/21 19:09:00 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/WebServer.hpp"
+#include "../../includes/Client.hpp"
+#include <iostream>
+#include <sstream>
+#include <fstream>
+#include <fcntl.h>
+#include <unistd.h>
+#include <cstring>
+#include <sys/socket.h>		
 
-Client::Client(int fd) : _fd(fd), _state(READING) {
+/*Rafael, não sei onde, mas seu client em algum momento vai precisar checar 
+o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client.*/
+
+Client::Client(int fd) : _fd(fd), _state_e(READING) {
     _lastActivity = time(NULL);
 }
 
@@ -64,26 +74,29 @@ bool Client::readData() {
             // Aqui futuramente chamaremos o Parser
             _response = _buildStaticResponse();
             
-            _state = WRITING; // Muda o estado do client
+            _state_e = WRITING; // Muda o estado do client
             return true; // Retorna true avisando o Server que quer escrever
         }
         return false; // Ainda não terminou de ler os pacotes
     }
     else {
-        _state = CLOSED;
+        _state_e = CLOSED;
         return true; // O cliente desconectou ou deu erro
     }
 }
 
 bool Client::writeData() {
-    //Pegamos a bandeja (_response) e atiramos pelo tubo do Socket (_fd)
-    int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
-    
-    if (bytesSent > 0) {
-        _state = CLOSED; // No HTTP/1.1 básico, terminamos e fechamos.
-        return true; // Retorna true avisando o Server que pode matá-lo
-    }
-    
-    _state = CLOSED;
-    return true; // Erro no envio
+
+	if (!_response.empty()) {
+		int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
+		if (bytesSent > 0) {
+            std::cout << "-> Resposta enviada para o fd " << _fd << "!" << std::endl;
+		}
+		_response.clear();
+        _state_e = CLOSED;
+		return true;
+	}
+
+    _state_e = CLOSED;
+    return true;
 }
