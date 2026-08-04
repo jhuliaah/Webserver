@@ -25,15 +25,8 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
-	/* não estamos usando argv ainda,
-	só quando o Config estiver pronto */
-	(void)argv;
-
     try {
-        /* quando o Config da @jhuliaah estiver pronto, a gente
-		vai chamar assim: Config config = makeConfig(argc, argv);
-		essa versão makeConfig é um overload só para fazer um mock. */
-		Config config = makeConfig("MOCK_BASIC");
+		Config config = makeConfig(argc, argv);
         Server server(config);
 		server.initServer(); // Configura sockaddr_in, faz o bind() e o listen()
 		server.serverLoop(); // Inicia o vigia do poll() no loop infinito

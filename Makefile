@@ -3,6 +3,7 @@ SRCS = srcs/main.cpp \
 	srcs/server/Server.cpp \
 	srcs/server/Socket.cpp \
 	srcs/server/Client.cpp \
+	srcs/config/Config.cpp \
 	srcs/config/ConfigParser.cpp \
 	srcs/config/Tokenizer.config.cpp \
 	srcs/config/ServerConfig.cpp \

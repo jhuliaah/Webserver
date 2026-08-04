@@ -18,8 +18,9 @@
 #include <string>
 
 #include "Socket.hpp"
-#include "Client.hpp"
 #include "Config.hpp"
+
+class Client;
 
 class Server{
 	private:
@@ -28,6 +29,7 @@ class Server{
 		std::vector<int>			_serverFds;
 		std::map<int, Client*>		_clients;
 		std::map<int, Client*>		_cgiPipes;
+		std::map<int, Client*>		_cgiWritePipes;
 		Config						_config;
 
 
@@ -38,6 +40,8 @@ class Server{
 		void	writeToClient(int fd);
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
+		void	handleCgiRead(int pipeFd);
+		void	handleCgiWrite(int pipeFd);
 
 		void removeClient(int fd);
 

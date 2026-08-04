@@ -8,31 +8,39 @@
 
 typedef std::string string;
 
-struct location
+/* Renomeados de `location`/`ServerConfig` para `ParsedLocation`/
+`ParsedServer`: esses nomes colidiam com as classes `LocationConfig`/
+`ServerConfig` (LocationConfig.hpp/ServerConfig.hpp) já usadas pelo Router,
+Server e Config — dois tipos com o mesmo nome no escopo global não compilam
+quando os dois mundos precisam ser incluídos juntos (ex: Config.cpp). */
+struct ParsedLocation
 {
     string  path;
     string  root;
     string  index;
     string  redirect;
     string  uploadDir;
+    string  cgiPath;
+    string  cgiExt;
     std::vector<string> methods;
     bool    autoindex;
-    std::map<string, string> cgiExtensions;
 
-    location()
+    ParsedLocation()
         : autoindex(false) {}
 };
 
-struct ServerConfig
+struct ParsedServer
 {
     string                  host;
     int                     port;
+    string                  root;
+    string                  index;
     std::vector<string>     serverName;
     std::map<int, string>   errorPages;
     size_t                  clientMaxBodySize;
-    std::vector<location>   locations;
+    std::vector<ParsedLocation>   locations;
 
-    ServerConfig()
+    ParsedServer()
         : port(0), clientMaxBodySize(1048576) {}
 };
 
