@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/07/28 18:09:27 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/03 18:17:21 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include "../../includes/Client.hpp"
 #include "../../includes/Router.hpp"
 #include "../../includes/Exeptions.hpp"
+#include "../../includes/DeleteHandler.hpp"
 
 #include <arpa/inet.h>		// inet_addr
 #include <fcntl.h>			// fcntl, F_SETFL, O_NONBLOCK
@@ -27,6 +28,8 @@
 #include <ctime>			// time, time_t
 #include <iostream>			// cout, endl
 #include <signal.h>
+#include <sys/wait.h>
+#include "../../includes/CgiHandler.hpp"
 
 /* 
 O Router vai ser usado MAIS OU MENOS assim em Server.cpp, como utility class:
@@ -220,29 +223,61 @@ void Server::serverLoop(){
 					if (client->getState() == Client::CLOSED) {
 						removeClient(currentFd);
 					}
-					else {
-						CgiHandler cgi;
-						LocationConfig locMock;
+						else {
+                            // ===========================================================
+                            // MINI-ROUTER TEMPORÁRIO PARA TESTES
+                            // ===========================================================
+                            
+                            // 1. Extração "Pobre" da URI (A Jhulia fará isto de forma segura no Parser)
+                            // Pega no que está entre o '/' e o ' HTTP/1.1'
+                            size_t start = client->getRawRequest().find("/");
+                            size_t end = client->getRawRequest().find(" ", start);
+                            if (start != std::string::npos && end != std::string::npos) {
+                                std::string uri = client->getRawRequest().substr(start, end - start);
+                                client->getRequest().setUri(uri);
+                            }
 
-						if (cgi.handle(client->getRequest(), locMock, *client) == false) {
-							int pipeOutFd = client->getCgiContext().stdout_fd;
-							_cgiPipes[pipeOutFd] = client;
-
-							struct epoll_event evRead;
-							evRead.events = EPOLLIN | EPOLLHUP | EPOLLERR;
-							evRead.data.fd = pipeOutFd;
-							epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOutFd, &evRead);
-
-							int pipeInFd = client->getCgiContext().stdin_fd;
-							if (pipeInFd != -1) {
-								_cgiWritePipes[pipeInFd] = client;
-								struct epoll_event evWrite;
-								evWrite.events = EPOLLOUT;
-								evWrite.data.fd = pipeInFd;
-								epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeInFd, &evWrite);
-							}
-						}
-					}
+                            // 2. Se a primeira palavra da requisição for DELETE
+                            if (client->getRawRequest().find("DELETE") == 0) {
+                                DeleteHandler del;
+                                LocationConfig locMock;
+                                
+                                // O del.handle vai fazer o unlink() e mudar o estado para WRITING
+                                if (del.handle(client->getRequest(), locMock, *client) == true) {
+                                    // Avisamos o epoll que estamos prontos para cuspir a resposta na porta do cliente
+                                    struct epoll_event event;
+                                    event.events = EPOLLOUT;
+                                    event.data.fd = currentFd;
+                                    epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                                }
+                            }
+                            // 3. Se for GET ou POST, mandamos para o teu CGI maravilhoso
+                            else {
+                                CgiHandler cgi;
+                                LocationConfig locMock;
+                                
+                                if (cgi.handle(client->getRequest(), locMock, *client) == false) {
+                                    // Tubo de LEITURA
+                                    int pipeOutFd = client->getCgiContext().stdout_fd;
+                                    _cgiPipes[pipeOutFd] = client;
+                                    struct epoll_event evRead;
+                                    evRead.events = EPOLLIN;
+                                    evRead.data.fd = pipeOutFd;
+                                    epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOutFd, &evRead);
+                                    
+                                    // Tubo de ESCRITA (Se existir)
+                                    int pipeInFd = client->getCgiContext().stdin_fd;
+                                    if (pipeInFd != -1) {
+                                        _cgiWritePipes[pipeInFd] = client;
+                                        struct epoll_event evWrite;
+                                        evWrite.events = EPOLLOUT;
+                                        evWrite.data.fd = pipeInFd;
+                                        epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeInFd, &evWrite);
+                                    }
+                                }
+                            }
+                            // ===========================================================
+                        }
 				}
 			}
                     // // Manda o Cliente ler os próprios dados

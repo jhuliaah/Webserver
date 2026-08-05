@@ -18,7 +18,7 @@
 #include <ctime>
 #include <fstream>
 #include <sys/types.h>
-#include "WebServer.hpp"
+#include "HttpRequest.hpp"
 
 
 class Client {
