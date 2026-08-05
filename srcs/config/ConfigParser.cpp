@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <fstream>
 #include <sstream>
+#include <cctype>
 
 //Perror
 void ConfigParser::expect(const std::vector<string> &tokens, size_t i, const string &value)
@@ -55,6 +56,7 @@ std::vector<ParsedServer> ConfigParser::parseTokens(const std::vector<string> &t
 ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, size_t &i)
 {
     ParsedServer server;
+    bool rootSeen = false;
 
     while (i <tokens.size() && tokens[i] != "}")
     {
@@ -62,8 +64,11 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
 
         if (key == "root")
         {
+            if (rootSeen)
+                throw ParseException("duplicate root directive in server block");
             i++;
             server.root = tokens[i];
+            rootSeen = true;
             i++;
             expect(tokens, i, ";");
             i++;
@@ -84,12 +89,19 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
             if (separator != std::string::npos)
             {
                 server.host = value.substr(0, separator);
-                server.port = std::atoi(value.substr(separator + 1).c_str());
+                string portStr = value.substr(separator + 1);
+                if (!isValidIPv4(server.host))
+                    throw ParseException("invalid IP in listen: " + server.host);
+                if (!isValidPort(portStr))
+                    throw ParseException("invalid port in listen: " + portStr);
+                server.port = std::atoi(portStr.c_str());
             }
             else
             {
                 server.host = "0.0.0.0";
-                server.port = std::atoi(value.substr(separator + 1).c_str());
+                if (!isValidPort(value))
+                    throw ParseException("invalid port in listen: " + value);
+                server.port = std::atoi(value.c_str());
             }
             i++;
             expect(tokens, i, ";");
@@ -130,7 +142,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         {
             i++;
             //casting the string to size_t 
-            server.clientMaxBodySize = static_cast<size_t>(std::atol(tokens[i].c_str()));
+            server.clientMaxBodySize = parseSize(tokens[i]);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -146,6 +158,11 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
             loc.path = path;
             expect(tokens, i, "}");
             i++;
+
+            for (size_t l = 0; l < server.locations.size(); ++l)
+                if (server.locations[l].path == loc.path)
+                    throw ParseException("duplicate location path: " + loc.path);
+
             server.locations.push_back(loc);
         }
         else
@@ -200,11 +217,10 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "return")
         {
             i++;
-            while (i < tokens.size() && tokens[i] != ";")
-            {
-                loc.redirect = tokens[i];
-                i++;
-            }
+            loc.redirectCode = std::atoi(tokens[i].c_str());
+            i++;
+            loc.redirect = tokens[i];
+            i++;
             expect(tokens, i, ";");
             i++;
         }
@@ -236,4 +252,65 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
             throw ParseException("unknown token in Location block: " + key);
     }
     return (loc);
+}
+
+
+// converts "2k" / "5M" / "1024" in bytes
+size_t ConfigParser::parseSize(const string &value)
+{
+    if (value.empty())
+        throw ParseException("empty size value in config");
+
+    char suffix = value[value.size() - 1];
+    string digits = value;
+    size_t multiplier = 1;
+
+    if (suffix == 'k' || suffix == 'K')
+    {
+        multiplier = 1024;
+        digits = value.substr(0, value.size() - 1);
+    }
+    else if (suffix == 'm' || suffix == 'M')
+    {
+        multiplier = 1024 * 1024;
+        digits = value.substr(0, value.size() - 1);
+    }
+
+    for (size_t c = 0; c < digits.size(); ++c)
+        if (!std::isdigit(static_cast<unsigned char>(digits[c])))
+            throw ParseException("invalid client_max_body_size value: " + value);
+
+    return (static_cast<size_t>(std::atol(digits.c_str())) * multiplier);
+}
+
+bool ConfigParser::isValidPort(const string &value)
+{
+    if (value.empty())
+        return false;
+    for (size_t c = 0; c < value.size(); ++c)
+        if (!std::isdigit(static_cast<unsigned char>(value[c])))
+            return false;
+    int port = std::atoi(value.c_str());
+    return (port > 0 && port <= 65535);
+}
+
+bool ConfigParser::isValidIPv4(const string &value)
+{
+    std::istringstream iss(value);
+    string octet;
+    int count = 0;
+
+    while (std::getline(iss, octet, '.'))
+    {
+        if (octet.empty() || octet.size() > 3)
+            return false;
+        for (size_t c = 0; c < octet.size(); ++c)
+            if (!std::isdigit(static_cast<unsigned char>(octet[c])))
+                return false;
+        int n = std::atoi(octet.c_str());
+        if (n < 0 || n > 255)
+            return false;
+        ++count;
+    }
+    return (count == 4);
 }

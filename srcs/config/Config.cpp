@@ -15,6 +15,8 @@ static LocationConfig toLocationConfig(const ParsedLocation &src)
 	loc._autoindex = src.autoindex;
 	loc._cgi_extension = src.cgiExt;
 	loc._cgi_path = src.cgiPath;
+	loc._returnCode = src.redirectCode;
+	loc._returnPath = src.redirect;
 	return loc;
 }
 

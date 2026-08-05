@@ -15,9 +15,6 @@ class Config {
 
 };
 
-/* esse makeconfig serve para retornar um arquivo de configuração
-de acordo com a presença ou não de um argumento na linha de comando.
-tem que ficar como função auxiliar, não deve ser um método. */
 Config makeConfig(int argc, char* argv[]);
 
 #endif
