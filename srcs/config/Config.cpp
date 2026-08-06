@@ -26,15 +26,15 @@ static ServerConfig toServerConfigClass(const ParsedServer &src)
 {
 	ServerConfig server;
 
-	server._port = src.port;
-	server._host = src.host;
-	server._name = src.serverName.empty() ? "" : src.serverName[0];
-	server._root = src.root;
-	server._index = src.index;
-	server._max_body_size = src.clientMaxBodySize;
-	server._error_pages = src.errorPages;
+	server.setPort(src.port);
+	server.setHost(src.host);
+	server.setName(src.serverName.empty() ? "" : src.serverName[0]);
+	server.setRoot(src.root);
+	server.setIndex(src.index);
+	server.setMaxBodySize(src.clientMaxBodySize);
+	server.setErrorPages(src.errorPages);
 	for (size_t i = 0; i < src.locations.size(); i++)
-		server._locations.push_back(toLocationConfig(src.locations[i]));
+		server.addLocation(toLocationConfig(src.locations[i]));
 	return server;
 }
 
@@ -48,7 +48,7 @@ static void loadFromPath(Config &config, const std::string &path)
 		throw ServerException(std::string("config parse failed -> ") + e.what());
 	}
 	for (size_t i = 0; i < parsed.size(); i++)
-		config._servers.push_back(toServerConfigClass(parsed[i]));
+		config.addServer(toServerConfigClass(parsed[i]));
 }
 
 Config::Config()
