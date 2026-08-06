@@ -45,7 +45,9 @@ class Client {
 
 		HttpRequest		_request;
 		CgiContext		_cgiContext;
-		//lembranças do norminette: typedef = _t, struct = _s, enum = _e
+		size_t			_bytesSent;
+		long			_contentLength;
+		//norminette memories: typedef = _t, struct = _s, enum = _e
 
 		std::string _buildStaticResponse();
 
