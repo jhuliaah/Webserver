@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:24:50 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/07/21 19:09:00 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/05 17:41:33 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,32 +30,6 @@ Client::~Client() {}
 
 bool Client::isTimeout(time_t currentTime, int timeoutLimit) {
     return (currentTime - _lastActivity > timeoutLimit);
-}
-
-std::string Client::_buildStaticResponse() {
-    std::ifstream   file("./www/index.html");
-    std::string     finalResponse;
-
-    if (file.is_open()){
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string body = buffer.str();
-        file.close();
-
-        std::stringstream responseStream;
-        responseStream << "HTTP/1.1 200 OK\r\n";
-        responseStream << "Content-Type: text/html; charset=utf-8\r\n";
-        responseStream << "Content-Length: " << body.length() << "\r\n\r\n";
-        responseStream << body;
-
-        finalResponse = responseStream.str();
-    } else {
-        std::string errorBody = "<html><body><center><h1>404 Not Found</h1></center></body></html>";
-        std::stringstream responseStream;
-        responseStream << "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: " << errorBody.length() << "\r\n\r\n" << errorBody;
-        finalResponse = responseStream.str();
-    }
-    return finalResponse;
 }
 
 bool Client::readData() {
