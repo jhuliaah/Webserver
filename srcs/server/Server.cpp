@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:29:14 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:30:14 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,20 +14,22 @@
 #include "../../includes/Client.hpp"
 #include "../../includes/Router.hpp"
 #include "../../includes/Exeptions.hpp"
+#include "../../includes/DeleteHandler.hpp"
 
 #include <arpa/inet.h>		// inet_addr
 #include <fcntl.h>			// fcntl, F_SETFL, O_NONBLOCK
 #include <netinet/in.h>		// sockaddr_in, htons
 #include <sys/epoll.h>		// epoll_create, epoll_ctl, epoll_wait, EPOLLIN/OUT
 #include <sys/socket.h>		// bind, listen, accept, socklen_t
-#include <sys/wait.h>		// waitpid
-#include <signal.h>			// kill, SIGKILL
 #include <unistd.h>			// close
 
 #include <cerrno>			// errno
 #include <cstring>			// strerror, memset
 #include <ctime>			// time, time_t
 #include <iostream>			// cout, endl
+#include <signal.h>
+#include <sys/wait.h>
+#include "../../includes/CgiHandler.hpp"
 
 /* 
 O Router vai ser usado MAIS OU MENOS assim em Server.cpp, como utility class:
@@ -64,12 +66,7 @@ void CREATE_FAKE_PORTS(std::vector<int> &ports) {
 //			Constructors		//
 //================================
 
-Server::Server(Config config)
-{
-	_epollFd = -1;
-    _config = config;
-    /*vamos guardar uma cópia de config? Acho que sim, mas nao tenho certeza */
-}
+Server::Server(Config config) : _epollFd(-1), _config(config) {}
 
 Server::~Server() {
 	for (size_t i = 0; i < _sockets.size(); i++){
@@ -217,39 +214,98 @@ void Server::serverLoop(){
 				handleCgiRead(currentFd);
 			}
 			else if (events[i].events & EPOLLIN) {
-                    // Manda o Cliente ler os próprios dados
-                    Client* client = _clients[currentFd];
-                    if (client->readData() == true) {
+				Client* client = _clients[currentFd];
+				client->getRequest().setMethod("POST");
+				client->getRequest().setBody("Mensagem Secreta do Rafael para o Python!");
+				client->getRequest().addHeader("Content-Length", "41");
 
-                        if (client->getState() == Client::CLOSED) {
-                            removeClient(currentFd);
+				if (client->readData() == true) {
+					if (client->getState() == Client::CLOSED) {
+						removeClient(currentFd);
+					}
+						else {
+                            // ===========================================================
+                            // MINI-ROUTER TEMPORÁRIO PARA TESTES
+                            // ===========================================================
+                            
+                            // 1. Extração "Pobre" da URI (A Jhulia fará isto de forma segura no Parser)
+                            // Pega no que está entre o '/' e o ' HTTP/1.1'
+                            size_t start = client->getRawRequest().find("/");
+                            size_t end = client->getRawRequest().find(" ", start);
+                            if (start != std::string::npos && end != std::string::npos) {
+                                std::string uri = client->getRawRequest().substr(start, end - start);
+                                client->getRequest().setUri(uri);
+                            }
+
+                            // 2. Se a primeira palavra da requisição for DELETE
+                            if (client->getRawRequest().find("DELETE") == 0) {
+                                DeleteHandler del;
+                                LocationConfig locMock;
+                                
+                                // O del.handle vai fazer o unlink() e mudar o estado para WRITING
+                                if (del.handle(client->getRequest(), locMock, *client) == true) {
+                                    // Avisamos o epoll que estamos prontos para cuspir a resposta na porta do cliente
+                                    struct epoll_event event;
+                                    event.events = EPOLLOUT;
+                                    event.data.fd = currentFd;
+                                    epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                                }
+                            }
+                            // 3. Se for GET ou POST, mandamos para o teu CGI maravilhoso
+                            else {
+                                CgiHandler cgi;
+                                LocationConfig locMock;
+                                
+                                if (cgi.handle(client->getRequest(), locMock, *client) == false) {
+                                    // Tubo de LEITURA
+                                    int pipeOutFd = client->getCgiContext().stdout_fd;
+                                    _cgiPipes[pipeOutFd] = client;
+                                    struct epoll_event evRead;
+                                    evRead.events = EPOLLIN;
+                                    evRead.data.fd = pipeOutFd;
+                                    epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOutFd, &evRead);
+                                    
+                                    // Tubo de ESCRITA (Se existir)
+                                    int pipeInFd = client->getCgiContext().stdin_fd;
+                                    if (pipeInFd != -1) {
+                                        _cgiWritePipes[pipeInFd] = client;
+                                        struct epoll_event evWrite;
+                                        evWrite.events = EPOLLOUT;
+                                        evWrite.data.fd = pipeInFd;
+                                        epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeInFd, &evWrite);
+                                    }
+                                }
+                            }
+                            // ===========================================================
                         }
-                        else if (client->getState() == Client::WRITING) {
-                            // O Cliente terminou de ler, muda para EPOLLOUT
-                            struct epoll_event event;
-                            event.events = EPOLLOUT;
-                            event.data.fd = currentFd;
-                            epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
-                        }
-						/* TODO: uma vez que o Router souber decidir estático
-						vs CGI a partir da request real, é aqui que entra a
-						chamada de CgiHandler::handle() (ver cgi-bin/CgiHandler
-						já pronto) -- ainda não existe parsing de request real
-						nem Router::handle() implementado para alimentar essa
-						decisão, então não inventei um gatilho aqui. */
-                    }
-            }
-			else if (events[i].events & EPOLLOUT) {
+				}
+			}
+                    // // Manda o Cliente ler os próprios dados
+                    // Client* client = _clients[currentFd];
+                    // if (client->readData() == true) {
+                        
+                    //     if (client->getState() == Client::CLOSED) {
+                    //         removeClient(currentFd);
+                    //     } 
+                    //     else if (client->getState() == Client::WRITING) {
+                    //         // O Cliente terminou de ler, muda para EPOLLOUT
+                    //         struct epoll_event event;
+                    //         event.events = EPOLLOUT;
+                    //         event.data.fd = currentFd;
+                    //         epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+                    //     }
+					// }
+					else if (events[i].events & EPOLLOUT) {
 				if (_cgiWritePipes.count(currentFd)) {
-					handleCgiWrite(currentFd);
-				} else {
+                    handleCgiWrite(currentFd);
+                } else {
 					// Manda o Cliente enviar os próprios dados
 					Client* client = _clients[currentFd];
 					if (client->writeData() == true) {
 						removeClient(currentFd);
 					}
 				}
-			}
+            }
         }
         checkTimeouts();
     }
@@ -262,7 +318,7 @@ void Server::checkTimeouts() {
     while (it != _clients.end()) {
         Client* client = it->second;
 		int clientFd = it->first;
-
+        
 		if (client->getState() == Client::CGI_RUNNING) {
 			if (now - client->getCgiContext().startTime > 5) {
 				std::cout << "[TIMEOUT 504] CGI Script no fd " << clientFd << " travou. Matando processo!" << std::endl;
@@ -277,7 +333,7 @@ void Server::checkTimeouts() {
 					_cgiPipes.erase(pipeFd);
 					client->getCgiContext().stdout_fd = -1;
 				}
-
+				
 				std::string error504 = "HTTP/1.1 504 Gateway Timeout\r\nContent-Type: text/html\r\nContent-Length: 47\r\n\r\n<html><body><h1>504 Gateway Timeout</h1></body></html>";
 				client->setResponse(error504);
 				client->setState(Client::WRITING);
@@ -291,7 +347,7 @@ void Server::checkTimeouts() {
 		}
         else if (client->isTimeout(now, 60)) { // 60 segundos
             std::cout << "[CEIFADOR] Cliente no fd " << it->first << " expulso!" << std::endl;
-
+            
             int fdToErase = it->first;
             ++it;
             removeClient(fdToErase);
@@ -320,12 +376,12 @@ void Server::handleCgiRead(int pipeFd){
 
 		client->setResponse(client->getCgiContext().outputBuffer);
 		client->setState(Client::WRITING);
-
+		
 		struct epoll_event event;
 		event.events = EPOLLOUT;
 		event.data.fd = client->getFd();
 		epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
-
+		
 		waitpid(client->getCgiContext().pid, NULL, WNOHANG);
 		client->getCgiContext().pid = -1;
 		client->getCgiContext().stdout_fd = -1;
@@ -339,16 +395,16 @@ void Server::handleCgiWrite(int pipeFd) {
 	Client* client = _cgiWritePipes[pipeFd];
 	const std::string& body = client->getRequest().getBody();
 	size_t sent = client->getCgiContext().inputSent;
-
+	
 	if (sent < body.length()) {
 		int bytesWritten = write(pipeFd, body.c_str() + sent, body.length() - sent);
 
 		if (bytesWritten > 0) {
 			client->getCgiContext().inputSent += bytesWritten;
-			std::cout << "[CGI] Escritos " << bytesWritten << " bytes no tubo stdin do Python" << std::endl;
+			std::cout << "[CGI] Escritos " << bytesWritten << " bytes no tubo stdin do Python" << std::endl;			
 		} else if (bytesWritten < 0){ return; }
 	}
-
+	
 	if (client->getCgiContext().inputSent >= body.length()){
 		std::cout << "[CGI] Envio do Body concluido. Enviando EOF (close stdin_fd)!" << std::endl;
 
@@ -359,4 +415,3 @@ void Server::handleCgiWrite(int pipeFd) {
 		client->getCgiContext().stdin_fd = -1;
 	}
 }
-

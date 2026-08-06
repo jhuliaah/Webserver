@@ -40,5 +40,8 @@
 # debug information files
 *.dwo
 
+siege*
+webserv
+
 # Local working notes (not shared with the team)
 PROJECT_STATUS.md

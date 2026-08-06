@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 12:37:13 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:33:50 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,8 +36,6 @@ class Server{
 
 
 		void	handleNewConnection(int server_fd);
-		bool	readFromClient(int fd);
-		void	writeToClient(int fd);
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
 		void	handleCgiRead(int pipeFd);
@@ -46,7 +44,6 @@ class Server{
 		void removeClient(int fd);
 
 		Server();				// virou private, so cria server com config.
-		std::string _buildStaticResponse();
 
 	public:
 		Server(Config config);

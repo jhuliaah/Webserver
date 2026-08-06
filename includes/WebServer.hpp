@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 17:39:04 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 12:40:55 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:28:31 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,9 @@
 # include <vector>
 # include <map>
 
+# include <sys/types.h>
+# include <sys/wait.h>
+
 # include <ctime>
 
 # include <fstream>
@@ -38,3 +41,14 @@
 # include "Server.hpp"
 # include "Exeptions.hpp"
 # include "Client.hpp"
+# include "Config.hpp"
+# include "HttpRequest.hpp"
+# include "HttpResponse.hpp"
+# include "IRequestHandler.hpp"
+# include "LocationConfig.hpp"
+# include "RouteConfig.hpp"
+# include "Router.hpp"
+# include "ServerConfig.hpp"
+# include "StaticHandler.hpp"
+# include "CgiHandler.hpp"
+# include "CgiRequest.hpp"

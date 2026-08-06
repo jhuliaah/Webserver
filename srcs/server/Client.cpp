@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:24:50 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:23:03 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:37:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,32 +32,6 @@ bool Client::isTimeout(time_t currentTime, int timeoutLimit) {
     return (currentTime - _lastActivity > timeoutLimit);
 }
 
-std::string Client::_buildStaticResponse() {
-    std::ifstream   file("./www/index.html");
-    std::string     finalResponse;
-
-    if (file.is_open()){
-        std::stringstream buffer;
-        buffer << file.rdbuf();
-        std::string body = buffer.str();
-        file.close();
-
-        std::stringstream responseStream;
-        responseStream << "HTTP/1.1 200 OK\r\n";
-        responseStream << "Content-Type: text/html; charset=utf-8\r\n";
-        responseStream << "Content-Length: " << body.length() << "\r\n\r\n";
-        responseStream << body;
-
-        finalResponse = responseStream.str();
-    } else {
-        std::string errorBody = "<html><body><center><h1>404 Not Found</h1></center></body></html>";
-        std::stringstream responseStream;
-        responseStream << "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: " << errorBody.length() << "\r\n\r\n" << errorBody;
-        finalResponse = responseStream.str();
-    }
-    return finalResponse;
-}
-
 bool Client::readData() {
     char buffer[4096];
     std::memset(buffer, 0, sizeof(buffer));
@@ -72,7 +46,7 @@ bool Client::readData() {
             std::cout << "Requisicao completa recebida do fd: " << _fd << std::endl;
             
             // Aqui futuramente chamaremos o Parser
-            _response = _buildStaticResponse();
+            // _response = _buildStaticResponse();
             
             _state_e = WRITING; // Muda o estado do client
             return true; // Retorna true avisando o Server que quer escrever
@@ -86,14 +60,17 @@ bool Client::readData() {
 }
 
 bool Client::writeData() {
-    //Pegamos a bandeja (_response) e atiramos pelo tubo do Socket (_fd)
-    int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
-    
-    if (bytesSent > 0) {
-        _state_e = CLOSED; // No HTTP/1.1 básico, terminamos e fechamos.
-        return true; // Retorna true avisando o Server que pode matá-lo
-    }
-    
+
+	if (!_response.empty()) {
+		int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
+		if (bytesSent > 0) {
+            std::cout << "-> Resposta enviada para o fd " << _fd << "!" << std::endl;
+		}
+		_response.clear();
+        _state_e = CLOSED;
+		return true;
+	}
+
     _state_e = CLOSED;
-    return true; // Erro no envio
+    return true;
 }

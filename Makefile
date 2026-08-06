@@ -4,21 +4,22 @@ SRCS = srcs/main.cpp \
 	srcs/server/Socket.cpp \
 	srcs/server/Client.cpp \
 	srcs/config/Config.cpp \
+	srcs/config/LocationConfig.cpp \
 	srcs/config/ConfigParser.cpp \
 	srcs/config/Tokenizer.config.cpp \
 	srcs/config/ServerConfig.cpp \
-	srcs/config/LocationConfig.cpp \
 	srcs/config/Router.cpp \
 	srcs/HttpRequest.cpp \
 	srcs/HttpResponse.cpp \
 	srcs/handlers/StaticHandler.cpp \
 	srcs/handlers/CgiHandler.cpp \
+	srcs/handlers/DeleteHandler.cpp \
 
 
 OBJDIR = obj
 OBJS = $(SRCS:srcs/%.cpp=$(OBJDIR)/%.o)
 CC = c++
-CFLAGS = -std=c++98 -Wall -Wextra -Werror
+CFLAGS = -fsanitize=address -g3 -std=c++98 -Wall -Wextra -Werror
 RM = rm -rf
 
 all : $(NAME)

@@ -1,37 +1,29 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   CgiHandler.hpp                                     :+:      :+:    :+:   */
+/*   DeleteHandler.hpp                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/06 15:26:23 by ratanaka         ###   ########.fr       */
+/*   Created: 2026/08/03 17:46:33 by ratanaka          #+#    #+#             */
+/*   Updated: 2026/08/03 17:52:17 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef CGI_HANDLER_HPP
-# define CGI_HANDLER_HPP
+#ifndef DELETEHANDLER_HPP
+# define DELETEHANDLER_HPP
 
+# include "HttpRequest.hpp"
+# include "Client.hpp"
+# include "LocationConfig.hpp"
 # include <string>
-# include "IRequestHandler.hpp"
 
-class CgiHandler : public IRequestHandler
-{
-	private:
-		std::string _method;
-
-
+class DeleteHandler {
 	public:
-		CgiHandler();
-		~CgiHandler();
-
-		const std::string& getMethod() const;
-
-		char	**CgiEnvBuilder(const HttpRequest& req);
-		void	parseCgiOutput(	const std::string& buffer, HttpResponse& response);
-		bool	handle(const HttpRequest& req, const LocationConfig& loc, Client& client);
-
+		DeleteHandler();
+		~DeleteHandler();
+		
+		bool handle(const HttpRequest& req, const LocationConfig& loc, Client& client);
 };
 
 #endif

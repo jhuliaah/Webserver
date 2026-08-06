@@ -6,21 +6,16 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/07/28 17:45:17 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:29:29 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/CgiHandler.hpp"
+#include "../../includes/WebServer.hpp"
 #include "../../includes/Client.hpp"
 
 #include <cstdlib>
-#include <cstring>
-#include <iostream>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/wait.h>
-#include <ctime>
-#include <vector>
+
 
 CgiHandler::CgiHandler() {}
 
@@ -45,12 +40,12 @@ char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 	if (!contentLength.empty()) {
 		envList.push_back("CONTENT_LENGTH=" + contentLength);
 	}
-
+	
 	std::string contentType = req.getHeader("Content-Type");
 	if (!contentType.empty()) {
 		envList.push_back("CONTENT_TYPE=" + contentType);
 	}
-
+	
 	char** envp = new char*[envList.size() + 1];
 	for (size_t i = 0; i < envList.size(); ++i){
 		envp[i] = new char[envList[i].size() + 1];
@@ -64,14 +59,15 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, HttpResponse& respons
 {
     (void)buffer;
     (void)response;
-
+    
     /* TODO */
-    /*  essa funçao vai tratar a saida do CGI e preencher o objeto HttpResponse
+    /*  essa funçao vai tratar a saida do CGI e preencher o objeto HttpResponse 
         que vive dentro do objeto Client, que o giHandler::handle() recebeu. */
 }
 
 bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client)
 {
+	(void)req;
 	(void)loc;
 	int pipe_in[2]; // Servidor escreve [1] -> python le [0]
 	int pipe_out[2]; // python escreve [1] -> servidor le [0]
@@ -116,7 +112,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		cgi.stdout_fd = pipe_out[0];
 		cgi.startTime = time(NULL);
 		cgi.inputSent = 0;
-
+		
 		if (req.getMethod() == "POST") {
 			fcntl(pipe_in[1], F_SETFL, O_NONBLOCK);
 			cgi.stdin_fd = pipe_in[1];

@@ -1,7 +1,7 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*  StaticHandler.cpp                                     :+:      :+:    :+:   */
+/*   CgiRequest.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
@@ -10,27 +10,37 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/StaticHandler.hpp"
-#include <sys/stat.h>
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include "../include/HttpRequest.hpp"
+#include "../include/HttpResponse.hpp"
 
-StaticHandler::StaticHandler() {}
 
-StaticHandler::~StaticHandler() {}
+int main(void)
+{
+	HttpRequest req;
 
-bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client){
-	(void)loc;
-	(void)client;
+	req.method = "GET";
+	req.uri = "/cgi-bin/hello.py?name=eduardo";
+	req.path = "/cgi-bin/hello.py";
+	req.query_string = "name=eduardo";
 
-	//temporario ate ter o config
-	std::string filePath = "./www" + req.getUri();
-	//se pedirem a raiz "/", mandamos o index.html por defeito
-	if (req.getUri() == "/") {
-		filePath = "./www/index.html";
-	}
-	return false;
+	RouteConfig cgi_route;
+	cgi_route.path_prefix = "/cgi-bin/";
+	cgi_route.root = "./www";
+	cgi_route.cgi_extension = ".py";
+	cgi_route.cgi_path = "/usr/bin/python3";
+	cgi_route.is_cgi = true;
+
+	Router router;
+
+	router.add_route(cgi_route);
+
+	RouteConfig matched = router.match(req);
+
+
+
+
+
+
 }
 
 

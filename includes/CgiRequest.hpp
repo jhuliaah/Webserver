@@ -1,36 +1,31 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   CgiHandler.hpp                                     :+:      :+:    :+:   */
+/*   CgiRequest.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
+/*   By: eduribei <eduribei@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/06 15:26:23 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/06/13 18:20:17 by eduribei         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#ifndef CGI_HANDLER_HPP
-# define CGI_HANDLER_HPP
+#ifndef CGI_REQUEST_HPP
+# define CGI_REQUEST_HPP
 
 # include <string>
-# include "IRequestHandler.hpp"
 
-class CgiHandler : public IRequestHandler
+class CgiRequest
 {
 	private:
 		std::string _method;
 
 
 	public:
-		CgiHandler();
-		~CgiHandler();
+		CgiRequest();
+		~CgiRequest();
 
-		const std::string& getMethod() const;
-
-		char	**CgiEnvBuilder(const HttpRequest& req);
-		void	parseCgiOutput(	const std::string& buffer, HttpResponse& response);
-		bool	handle(const HttpRequest& req, const LocationConfig& loc, Client& client);
+		const std::string&  getMethod() const;
 
 };
 

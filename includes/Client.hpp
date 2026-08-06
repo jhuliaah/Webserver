@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/06/23 15:29:56 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 15:26:59 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,8 +16,10 @@
 #include <string>
 #include <cstddef>
 #include <ctime>
+#include <fstream>
 #include <sys/types.h>
 #include "HttpRequest.hpp"
+
 
 class Client {
 	public:
