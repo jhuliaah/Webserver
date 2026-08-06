@@ -6,12 +6,14 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 15:32:55 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/06 15:30:24 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 17:08:49 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../includes/Config.hpp"
 #include "../includes/Server.hpp"
+#include "../includes/ConfigParser.hpp"
+
 # include <iostream>
 
 int main(int argc, char* argv[]) {
@@ -20,13 +22,16 @@ int main(int argc, char* argv[]) {
 	aceitar com ou sem arquivo de configuracao.
 	agora só recusamos se vem mais de um arg. */
 
-	if (argc > 2) {
+	std::string configFile = "config_files/default/config.conf";
+	if (argc == 2) { configFile = argv[1]; }
+	else if (argc > 2) {
 		std::cout << "EX{./webserv <config_file>}" << std::endl;
 		return 1;
 	}
 
     try {
-		Config config = makeConfig(argc, argv);
+
+		Config config(configFile); 
         Server server(config);
 		server.initServer(); // Configura sockaddr_in, faz o bind() e o listen()
 		server.serverLoop(); // Inicia o vigia do poll() no loop infinito

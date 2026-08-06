@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/06 15:30:14 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/06 16:42:28 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,29 +39,6 @@ IRequestHandler *handler = makeHandler(type);
 bool done = handler->handle(req, *loc, client);
 delete handler;																*/
 
-//----------------------------mock--------------------------------------------//
-//---------------------------------------------------mock---------------------//
-//-------mock-----------------------------------------------------------------//
-/*
-                                      ▀▀                    
- ▀▀█▄ ████▄  ▀▀█▄ ▄████  ▀▀█▄ ████▄   ██  ▄█▀▀▀ ▄█▀▀▀ ▄███▄ 
-▄█▀██ ██ ██ ▄█▀██ ██ ██ ▄█▀██ ██ ▀▀   ██  ▀███▄ ▀███▄ ██ ██ 
-▀█▄██ ████▀ ▀█▄██ ▀████ ▀█▄██ ██      ██▄ ▄▄▄█▀ ▄▄▄█▀ ▀███▀  ler abaixo
-      ██             ██                                     
-      ▀▀           ▀▀▀                                                        */
-
-std::vector<int> _MOCK_ports; // PARA MOOOOOCK!!!!
-
-void CREATE_FAKE_PORTS(std::vector<int> &ports) {
-    ports.push_back(8080);
-    ports.push_back(8085);
-    ports.push_back(9005);
-};
-
-//-----mock-------------------------------------------------------------------//
-//----------------------------mock--------------------------------------------//
-//--------------------------------------------------------mock----------------//
-
 //================================
 //			Constructors		//
 //================================
@@ -89,48 +66,20 @@ bool Server::isServerFd(int fd) {
 //================================
 
 void	Server::initServer() {
-
-/*
-██████   █████  ███████  █████  ███████ ██      
-██   ██ ██   ██ ██      ██   ██ ██      ██      
-██████  ███████ █████   ███████ █████   ██      
-██   ██ ██   ██ ██      ██   ██ ██      ██         
-██   ██ ██   ██ ██      ██   ██ ███████ ███████
-                                                   
-                                           
-▄▄                                         
-██       ▀▀                            ▀▀  
-██ ▄█▀█▄ ██   ▀▀█▄    ▀▀█▄ ▄████ ██ ██ ██  
-██ ██▄█▀ ██  ▄█▀██   ▄█▀██ ██ ██ ██ ██ ██  
-██ ▀█▄▄▄ ██▄ ▀█▄██   ▀█▄██ ▀████ ▀██▀█ ██▄ 
-                              ██           
-                              ▀▀           
-@Zephele Como você estava usando os fake ports, eu mantive eles aqui para não
-quebrar o seu coódigo. Mas veja que na main.cpp e em Config.cpp eu já estou
-criando um objeto de config com valores mockados.
-
-A primeira coisa que você precisa fazer agora é parar de usar os fake ports
-e passar a usar o objeto de config que vem da main.cpp. Não faço ideia do
-que precisa mudar no seu código, dá essa força aí.                             
-*/
-
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    CREATE_FAKE_PORTS(_MOCK_ports); // PARA MOOOOOCK!!!!
-    // !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
-
     _epollFd = epoll_create(10);
 	if (_epollFd == -1)
 		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
 
-	for (size_t i = 0; i < _MOCK_ports.size(); i++){
+	std::vector<ServerConfig> _servers = _config.getServers();
+	for (size_t i = 0; i < _servers.size(); i++){
+		int		currentPort = _servers[i].getPort();
 		Socket*	newSocket = new Socket();
 		int		fd = newSocket->getFd();
 	
 		struct	sockaddr_in address;
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family		= AF_INET; // usando IPv4
-		address.sin_port		= htons(_MOCK_ports[i]); // htons é um tradutor (portavai ser 8080)
+		address.sin_port		= htons(currentPort); // htons é um tradutor (portavai ser 8080)
 		address.sin_addr.s_addr	= inet_addr("127.0.0.1"); //por enquanto só vai aceitar conexões do localhost, mas futuramente vamos aceitar de qualquer lugar (INADDR_ANY)
 	
 		//bind() -> este socket vai receber conexoes na porta 8080
@@ -148,7 +97,7 @@ que precisa mudar no seu código, dá essa força aí.
 		if (epoll_ctl(_epollFd, EPOLL_CTL_ADD, fd, &event) == -1)
 			throw ServerException(std::string("epoll_ctl failed -> ") + strerror(errno));
 
-		std::cout << "Server listening on port " << _MOCK_ports[i] << " (fd: " << fd << ")" << std::endl;
+		std::cout << "Server listening on port " << currentPort << " (fd: " << fd << ")" << std::endl;
 	}
 }
 
