@@ -22,6 +22,7 @@ StaticHandler::~StaticHandler() {}
 
 bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client){
 	(void)loc;
+	(void)client;
 
 	//temporario ate ter o config
 	std::string filePath = "./www" + req.getUri();
@@ -29,6 +30,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	if (req.getUri() == "/") {
 		filePath = "./www/index.html";
 	}
+	return false;
 }
 
 

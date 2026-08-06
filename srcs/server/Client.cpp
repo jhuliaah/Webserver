@@ -6,11 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:24:50 by ratanaka          #+#    #+#             */
-<<<<<<< HEAD
-/*   Updated: 2026/08/05 17:41:33 by ratanaka         ###   ########.fr       */
-=======
-/*   Updated: 2026/06/23 15:23:03 by ratanaka         ###   ########.fr       */
->>>>>>> 8b7d808a487617deda68f9be990da1e3ad802110
+/*   Updated: 2026/08/06 15:37:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,7 +46,7 @@ bool Client::readData() {
             std::cout << "Requisicao completa recebida do fd: " << _fd << std::endl;
             
             // Aqui futuramente chamaremos o Parser
-            _response = _buildStaticResponse();
+            // _response = _buildStaticResponse();
             
             _state_e = WRITING; // Muda o estado do client
             return true; // Retorna true avisando o Server que quer escrever
