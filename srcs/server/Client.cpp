@@ -17,12 +17,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <cstring>
-#include <sys/socket.h>		
+#include <cstdlib>
+#include <sys/socket.h>
 
 /*Rafael, não sei onde, mas seu client em algum momento vai precisar checar 
 o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client.*/
 
-Client::Client(int fd) : _fd(fd), _state_e(READING) {
+Client::Client(int fd) : _fd(fd), _state_e(READING), _bytesSent(0), _contentLength(-1) {
     _lastActivity = time(NULL);
 }
 
@@ -58,42 +59,89 @@ std::string Client::_buildStaticResponse() {
     return finalResponse;
 }
 
+// bool Client::readData() {
+//     char buffer[4096];
+//     std::memset(buffer, 0, sizeof(buffer));
+
+//     int bytes = recv(_fd, buffer, sizeof(buffer) - 1, 0);
+
+//     if (bytes > 0) {
+//         _lastActivity = time(NULL); // Atualiza o relógio!
+//         _rawRequest.append(buffer, bytes);
+        
+//         if (_rawRequest.find("\r\n\r\n") != std::string::npos) {
+//             std::cout << "Requisicao completa recebida do fd: " << _fd << std::endl;
+            
+//             // Aqui futuramente chamaremos o Parser
+//             _response = _buildStaticResponse();
+            
+//             _state_e = WRITING; // Muda o estado do client
+//             return true; // Retorna true avisando o Server que quer escrever
+//         }
+//         return false; // Ainda não terminou de ler os pacotes
+//     }
+//     else {
+//         _state_e = CLOSED;
+//         return true; // O cliente desconectou ou deu erro
+//     }
+// }
+
 bool Client::readData() {
+
     char buffer[4096];
     std::memset(buffer, 0, sizeof(buffer));
 
     int bytes = recv(_fd, buffer, sizeof(buffer) - 1, 0);
 
-    if (bytes > 0) {
-        _lastActivity = time(NULL); // Atualiza o relógio!
+    if (bytes > 0)
+    {
+        _lastActivity = time(NULL);
         _rawRequest.append(buffer, bytes);
-        
-        if (_rawRequest.find("\r\n\r\n") != std::string::npos) {
-            std::cout << "Requisicao completa recebida do fd: " << _fd << std::endl;
-            
-            // Aqui futuramente chamaremos o Parser
-            _response = _buildStaticResponse();
-            
-            _state_e = WRITING; // Muda o estado do client
-            return true; // Retorna true avisando o Server que quer escrever
+
+        size_t headerEnd = _rawRequest.find("\r\n\r\n");
+        if (headerEnd == std::string::npos)
+            return (false);
+
+        if (_contentLength == -1)
+        {
+            size_t C1Pos = _rawRequest.find("Content-Length:");
+            if (C1Pos != std::string::npos && C1Pos < headerEnd)
+                _contentLength = std::atol(_rawRequest.c_str() + C1Pos + 16);
+            else
+                _contentLength = 0;
         }
-        return false; // Ainda não terminou de ler os pacotes
+
+        size_t bodyReceived = _rawRequest.size() - (headerEnd + 4);
+
+        if (static_cast<long>(bodyReceived) < _contentLength)
+            return (false);
+
+        std::cout << "Complete requisition received in: " <<_fd << " fd" << std::endl;
+        _response = _buildStaticResponse();
+        _state_e = WRITING;
+        return (true);
     }
-    else {
+    else{
         _state_e = CLOSED;
-        return true; // O cliente desconectou ou deu erro
+        return (true);
     }
+
 }
 
 bool Client::writeData() {
-    //Pegamos a bandeja (_response) e atiramos pelo tubo do Socket (_fd)
-    int bytesSent = send(_fd, _response.c_str(), _response.size(), 0);
-    
-    if (bytesSent > 0) {
-        _state_e = CLOSED; // No HTTP/1.1 básico, terminamos e fechamos.
-        return true; // Retorna true avisando o Server que pode matá-lo
+    const char *data = _response.c_str() + _bytesSent;
+    size_t remaining = _response.size() - _bytesSent;
+
+    int bytesSent = send(_fd, data, remaining, 0);
+
+    if (bytesSent > 0)
+        _bytesSent += bytesSent;
+
+    if (_bytesSent >= _response.size()) {
+        _state_e = CLOSED; // mandou tudo, agora sim pode fechar
+        return true;
     }
-    
-    _state_e = CLOSED;
-    return true; // Erro no envio
+
+    return false; // ainda falta mandar, o Server chama de novo no próximo poll()
 }
+

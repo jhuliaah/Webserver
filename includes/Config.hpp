@@ -13,6 +13,7 @@ class Config {
 
 		std::vector<ServerConfig> _servers;
 
+	private:
 };
 
 Config makeConfig(int argc, char* argv[]);
