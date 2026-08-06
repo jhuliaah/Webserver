@@ -16,6 +16,8 @@ class LocationConfig {
 		bool						_autoindex;
 		std::string					_cgi_extension;
 		std::string					_cgi_path;
+		std::string					_returnPath;
+		int							_returnCode;
 };
 
 #endif

@@ -1,272 +1,71 @@
 #include "../../includes/Config.hpp"
-#include "../../includes/ServerConfig.hpp"
-#include "../../includes/LocationConfig.hpp"
+#include "../../includes/ConfigParser.hpp"
+#include "../../includes/Exeptions.hpp"
+
+/* Converte a struct ParsedLocation (mundo do ConfigParser/ConfigTypes.hpp)
+para a classe LocationConfig (mundo do Router/Server/StaticHandler). */
+static LocationConfig toLocationConfig(const ParsedLocation &src)
+{
+	LocationConfig loc;
+
+	loc._path = src.path;
+	loc._methods = src.methods;
+	loc._root = src.root;
+	loc._index = src.index;
+	loc._autoindex = src.autoindex;
+	loc._cgi_extension = src.cgiExt;
+	loc._cgi_path = src.cgiPath;
+	loc._returnCode = src.redirectCode;
+	loc._returnPath = src.redirect;
+	return loc;
+}
+
+/* Converte a struct ParsedServer (ConfigTypes.hpp) para a classe ServerConfig
+(ServerConfig.hpp) usada pelo resto do servidor. */
+static ServerConfig toServerConfigClass(const ParsedServer &src)
+{
+	ServerConfig server;
+
+	server._port = src.port;
+	server._host = src.host;
+	server._name = src.serverName.empty() ? "" : src.serverName[0];
+	server._root = src.root;
+	server._index = src.index;
+	server._max_body_size = src.clientMaxBodySize;
+	server._error_pages = src.errorPages;
+	for (size_t i = 0; i < src.locations.size(); i++)
+		server._locations.push_back(toLocationConfig(src.locations[i]));
+	return server;
+}
+
+static void loadFromPath(Config &config, const std::string &path)
+{
+	std::vector<ParsedServer> parsed;
+
+	try {
+		parsed = ConfigParser::parse(path);
+	} catch (const ConfigParser::ParseException &e) {
+		throw ServerException(std::string("config parse failed -> ") + e.what());
+	}
+	for (size_t i = 0; i < parsed.size(); i++)
+		config._servers.push_back(toServerConfigClass(parsed[i]));
+}
 
 Config::Config()
 {
-	// CHAMA ARQUIVO DEFAULT
-	// VALIDA (mesmo sendo o default, tem que validar,
-	// porque o user pode ter alterado o .config default)
+	loadFromPath(*this, "config_files/default/config.conf");
 }
 
-Config::Config(std::string)
+Config::Config(std::string path)
 {
-	// CHAMA ARGV1
-	// VALIDA
+	loadFromPath(*this, path);
 }
 
-Config::~Config(){}
+Config::~Config() {}
 
-
-Config makeConfig(int argc, char* argv[])
+Config makeConfig(int argc, char *argv[])
 {
 	if (argc == 2)
 		return Config(argv[1]);
 	return Config();
 }
-
-
-static LocationConfig makeLocation(const std::string& path, bool autoindex)
-{
-	LocationConfig loc;
-
-	loc._path = path;
-	loc._autoindex = autoindex;
-	return (loc);
-}
-
-/////// fim ////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////
-/*                                                                             
-                                 ▄▄                             ▄▄           
-                     ▄▄          ██                            ██  ▀▀        
-███▄███▄ ▄███▄ ▄████ ██ ▄█▀   ▄████ ▄█▀█▄   ▄████ ▄███▄ ████▄ ▀██▀ ██  ▄████ 
-██ ██ ██ ██ ██ ██    ████     ██ ██ ██▄█▀   ██    ██ ██ ██ ██  ██  ██  ██ ██ 
-██ ██ ██ ▀███▀ ▀████ ██ ▀█▄   ▀████ ▀█▄▄▄   ▀████ ▀███▀ ██ ██  ██  ██▄ ▀████ 
-                                                                          ██ 
-                                                                        ▀▀▀  
-APAGAR TUDO ISSO QUANDO CONCLUIR O CONFIG!!!!!!!!!!!! ------------------------*/
-
-static ServerConfig makeServer8080()
-{
-	ServerConfig server;
-
-	server._port = 8080;
-	server._host = "127.0.0.1";
-	server._name = "127.0.0.1";
-	server._root = "./www/";
-	server._index = "index.html";
-	server._max_body_size = 2048;
-
-	server._error_pages[403] = "error_pages/403.html";
-	server._error_pages[404] = "error_pages/404.html";
-	server._error_pages[405] = "error_pages/405.html";
-	server._error_pages[413] = "error_pages/413.html";
-	server._error_pages[500] = "error_pages/500.html";
-
-	LocationConfig root = makeLocation("/", false);
-	root._methods.push_back("GET");
-	root._methods.push_back("POST");
-	root._methods.push_back("DELETE");
-	server._locations.push_back(root);
-
-	LocationConfig uploads = makeLocation("/uploads", true);
-	uploads._methods.push_back("GET");
-	uploads._methods.push_back("POST");
-	uploads._methods.push_back("DELETE");
-	server._locations.push_back(uploads);
-
-	LocationConfig readonly = makeLocation("/readonly", true);
-	readonly._methods.push_back("GET");
-	server._locations.push_back(readonly);
-
-	LocationConfig errorPages = makeLocation("/error_pages", true);
-	errorPages._methods.push_back("GET");
-	server._locations.push_back(errorPages);
-
-	LocationConfig cgi = makeLocation("/cgi-bin", false);
-	cgi._methods.push_back("GET");
-	cgi._methods.push_back("POST");
-	cgi._cgi_path = "/usr/bin/python3";
-	cgi._cgi_extension = ".py";
-	server._locations.push_back(cgi);
-
-	return (server);
-}
-
-static ServerConfig makeServer8081()
-{
-	ServerConfig server;
-
-	server._port = 8081;
-	server._host = "127.0.0.1";
-	server._name = "127.0.0.1";
-	server._root = "./www/listener/";
-	server._index = "index.html";
-	server._max_body_size = 2048;
-
-	LocationConfig root = makeLocation("/", false);
-	root._methods.push_back("GET");
-	root._methods.push_back("POST");
-	root._methods.push_back("DELETE");
-	server._locations.push_back(root);
-
-	return (server);
-}
-
-Config makeConfig(std::string mocktype)
-{
-	Config config;
-
-	if (mocktype == "MOCK_BASIC")
-	{
-		config._servers.push_back(makeServer8080());
-		return (config);
-	}
-
-	if (mocktype == "MOCK_2SERVERS")
-	{
-		config._servers.push_back(makeServer8080());
-		config._servers.push_back(makeServer8081());
-		return (config);
-	}
-
-	return (config);
-}
-
-/*
-                        ▀▀                                          
- ▀▀█▄ ████▄ ▄████ ██ ██ ██ ██ ██ ▄███▄   ▄████ ██ ██ ▄█▀█▄          
-▄█▀██ ██ ▀▀ ██ ██ ██ ██ ██ ██▄██ ██ ██   ██ ██ ██ ██ ██▄█▀          
-▀█▄██ ██    ▀████ ▀██▀█ ██▄ ▀█▀  ▀███▀   ▀████ ▀██▀█ ▀█▄▄▄          
-               ██                           ██                      
-               ▀▀                           ▀▀                      
-                                                                    
-                                                                    
-                                                             ▄▄     
-▄████ ▄█▀█▄ ████▄ ▄███▄ ██ ██   ▄███▄   ███▄███▄ ▄███▄ ▄████ ██ ▄█▀ 
-██ ██ ██▄█▀ ██ ▀▀ ██ ██ ██ ██   ██ ██   ██ ██ ██ ██ ██ ██    ████   
-▀████ ▀█▄▄▄ ██    ▀███▀ ▀██▀█   ▀███▀   ██ ██ ██ ▀███▀ ▀████ ██ ▀█▄ 
-   ██                                                               
- ▀▀▀                                                                		  */
-
-// ARQUIVO CONFIG 1 //////////////////////////////////
-// copiei o default do Pedro
-
-// server {
-//     listen 8080;
-//     server_name 127.0.0.1;
-//     root ./www/;
-//     index index.html;
-//     client_max_body_size 2k;
-
-//     error_page 403 error_pages/403.html;
-//     error_page 404 error_pages/404.html;
-//     error_page 405 error_pages/405.html;
-//     error_page 413 error_pages/413.html;
-//     error_page 500 error_pages/500.html;
-
-//     location / {
-//         allow_methods GET POST DELETE;
-//         autoindex off;
-//     }
-
-//     location /uploads {
-//         allow_methods GET POST DELETE;
-//         autoindex on;
-//     }
-
-//     location /readonly {
-//         allow_methods GET;
-//         autoindex on;
-//     }
-
-//     location /error_pages {
-//         allow_methods GET;
-//         autoindex on;
-//     }
-
-//     location /go-home {
-//         return 302 /;
-//     }
-
-//     location /cgi-bin {
-//         allow_methods GET POST;
-//         autoindex off;
-//         cgi_path /usr/bin/python3;
-//         cgi_ext .py;
-//     }
-// }
-
-
-// ARQUIVO CONFIG 2 //////////////////////////////////
-// o mesmo que o 1, mas com outro server, na porta 8081, e com root diferente
-
-
-// server {
-//     listen 8080;
-//     server_name 127.0.0.1;
-//     root ./www/;
-//     index index.html;
-//     client_max_body_size 2k;
-
-//     error_page 403 error_pages/403.html;
-//     error_page 404 error_pages/404.html;
-//     error_page 405 error_pages/405.html;
-//     error_page 413 error_pages/413.html;
-//     error_page 500 error_pages/500.html;
-
-//     location / {
-//         allow_methods GET POST DELETE;
-//         autoindex off;
-//     }
-
-//     location /uploads {
-//         allow_methods GET POST DELETE;
-//         autoindex on;
-//     }
-
-//     location /readonly {
-//         allow_methods GET;
-//         autoindex on;
-//     }
-
-//     location /error_pages {
-//         allow_methods GET;
-//         autoindex on;
-//     }
-
-//     location /go-home {
-//         return 302 /;
-//     }
-
-//     location /cgi-bin {
-//         allow_methods GET POST;
-//         autoindex off;
-//         cgi_path /usr/bin/python3;
-//         cgi_ext .py;
-//     }
-// }
-//
-// server {
-//     listen 8081;
-//     server_name 127.0.0.1;
-//     root ./www/listener/;
-//     index index.html;
-//     client_max_body_size 2k;
-
-//        location / {
-//         allow_methods GET POST DELETE;
-//         autoindex off;
-//     }
-// }

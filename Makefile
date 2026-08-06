@@ -4,8 +4,11 @@ SRCS = srcs/main.cpp \
 	srcs/server/Socket.cpp \
 	srcs/server/Client.cpp \
 	srcs/config/Config.cpp \
-	srcs/config/ServerConfig.cpp \
 	srcs/config/LocationConfig.cpp \
+	srcs/config/ConfigParser.cpp \
+	srcs/config/Tokenizer.config.cpp \
+	srcs/config/ServerConfig.cpp \
+	srcs/config/Router.cpp \
 	srcs/HttpRequest.cpp \
 	srcs/HttpResponse.cpp \
 	srcs/handlers/StaticHandler.cpp \
