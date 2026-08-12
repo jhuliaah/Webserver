@@ -8,15 +8,15 @@ static LocationConfig toLocationConfig(const ParsedLocation &src)
 {
 	LocationConfig loc;
 
-	loc._path = src.path;
-	loc._methods = src.methods;
-	loc._root = src.root;
-	loc._index = src.index;
-	loc._autoindex = src.autoindex;
-	loc._cgi_extension = src.cgiExt;
-	loc._cgi_path = src.cgiPath;
-	loc._returnCode = src.redirectCode;
-	loc._returnPath = src.redirect;
+	loc.setPath(src.path);
+	loc.setMethods(src.methods);
+	loc.setRoot(src.root);
+	loc.setIndex(src.index);
+	loc.setAutoindex(src.autoindex);
+	loc.setCgiExtension(src.cgiExt);
+	loc.setCgiPath(src.cgiPath);
+	loc.setReturnCode(src.redirectCode);
+	loc.setReturnPath(src.redirect);
 	return loc;
 }
 
