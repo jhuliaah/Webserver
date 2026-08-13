@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/03 17:52:46 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 19:14:44 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 20:43:30 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,24 +32,22 @@ bool DeleteHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 
 	// Verificar se o arquivo existe
 	if (access(filePath.c_str(), F_OK) == -1) {
-		std::cout << "[DELETE] Ficheiro não encontrado: " << filePath << std::endl;
+		std::cout << "[DELETE] File not found: " << filePath << std::endl;
 		std::string body = "<html><body><center><h1>404 Not Found</h1></center></body></html>";
 		responseStream << "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
 	}
 	// Verificar se pode apagar
 	else if (access(filePath.c_str(), W_OK) == -1) {
-		std::cout << "[DELETE] Sem permissão para apagar: " << filePath << std::endl;
+		std::cout << "[DELETE] No permission to delete: " << filePath << std::endl;
 		std::string body = "<html><body><center><h1>403 Forbidden</h1></center></body></html>";
 		responseStream << "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
 	}
 	else {
 		if (unlink(filePath.c_str()) == 0) {
-			std::cout << "[DELETE] Ficheiro apagado com sucesso: " << filePath << std::endl;
-			// O código 204 significa "Deu certo, mas não tenho nenhum corpo/HTML para te devolver"
+			std::cout << "[DELETE] File deleted successfully: " << filePath << std::endl;
 			responseStream << "HTTP/1.1 204 No Content\r\n\r\n";
 		} else {
-			// Se o unlink falhar
-			std::cout << "[DELETE] Erro interno ao apagar ficheiro." << std::endl;
+			std::cout << "[DELETE] Internal error while deleting file." << std::endl;
 			std::string body = "<html><body><center><h1>500 Internal Server Error</h1></center></body></html>";
 			responseStream << "HTTP/1.1 500 Internal Server Error\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
 		}

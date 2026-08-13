@@ -6,11 +6,12 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 17:21:08 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 20:40:32 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/StaticHandler.hpp"
+#include "../../includes/ErrorBuilder.hpp"
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
@@ -33,22 +34,24 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	
 	// O Ficheiro/Pasta existe?
 	if (stat(filePath.c_str(), &path_stat) != 0){
-		std::cout << "[STATIC] Erro 404: Não encontrado -> " << filePath << std::endl;
-		body = "<html><body><center><h1>404 Not Found</h1></center></body></html>";
-		responseStream << "HTTP/1.1 404 Not Found\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
+		std::cout << "[STATIC] Error 404: not found -> " << filePath << std::endl;
+		std::string errorPath = ""; // loc.getErrorPage(404); (to be adjusted with the config getter name)
+		client.setResponse(ErrorBuilder::build(404, errorPath));
+		client.setState(Client::WRITING);
+		return true;
 	}
 	// pasta comum
 	else if (S_ISDIR(path_stat.st_mode)){
 		std::string indexFile = loc.getIndex();
 		
 		if(!indexFile.empty()) {
-			std::cout << "[STATIC] Redirecionando para o index configurado: " << indexFile << std::endl;
+			std::cout << "[STATIC] Redirecting to configured index: " << indexFile << std::endl;
 			filePath += (filePath[filePath.length() - 1] == '/' ? "" : "/") + indexFile;
-			body = "<html><body><h1>Index carregado com sucesso do Config!</h1></body></html>";
+			body = "<html><body><h1>Index loaded successfully from config!</h1></body></html>";
 			responseStream << "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
 		}
 		else if (loc.getAutoindex() == true) {
-			std::cout << "[STATIC] Autoindex LIGADO! Listando pasta -> " << filePath << std::endl;
+			std::cout << "[STATIC] Autoindex enabled. Listing directory -> " << filePath << std::endl;
 			body = buildAutoIndex(filePath, req.getUri());
 			responseStream << "HTTP/1.1 200 OK\r\n"
 							<< "Content-Type: text/html\r\n"
@@ -56,14 +59,16 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 							<< body;
 		}
 		else {
-			std::cout << "[STATIC] Erro 403: Autoindex desligado -> " << filePath << std::endl;
-			body = "<html><body><center><h1>403 Forbidden</h1></center></body></html>";
-			responseStream << "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
+			std::cout << "[STATIC] Error 403: autoindex disabled -> " << filePath << std::endl;
+			std::string errorPath = "";
+			client.setResponse(ErrorBuilder::build(403, errorPath));
+			client.setState(Client::WRITING);
+			return true;
 		}
 	}
 	// ficheiro comum
 	else {
-		std::cout << "[STATIC] A iniciar Stream por Chunks para -> " << filePath << " (" << path_stat.st_size << " bytes)" << std::endl;
+		std::cout << "[STATIC] Starting chunked stream for -> " << filePath << " (" << path_stat.st_size << " bytes)" << std::endl;
 		responseStream << "HTTP/1.1 200 OK\r\n";
 		responseStream << "Content-Type: " << getMimeType(filePath) << "\r\n";
 		responseStream << "Content-Length: " << path_stat.st_size << "\r\n";
@@ -72,9 +77,11 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			client.setResponse(responseStream.str());
 			client.setState(Client::WRITING);
 		} else {
-			std::cout << "[STATIC] Erro 403: Sem permissão de leitura -> " << filePath << std::endl;
-			body = "<html><body><center><h1>403 Forbidden</h1></center></body></html>";
-			responseStream << "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
+			std::cout << "[STATIC] Error 403: no read permission -> " << filePath << std::endl;
+			std::string errorPath = "";
+			client.setResponse(ErrorBuilder::build(403, errorPath));
+			client.setState(Client::WRITING);
+			return true;
 		}
 	}
 	client.setResponse(responseStream.str());
@@ -102,7 +109,7 @@ std::string StaticHandler::buildAutoIndex(const std::string& path, const std::st
 		}
 		closedir(dir);
 	} else {
-		html << "Erro: Nao foi possivel abrir o diretorio.\n";
+		html << "Error: could not open directory.\n";
 	}
 	html << "</pre>\n<hr>\n</body>\n</html>\n";
 	return html.str();

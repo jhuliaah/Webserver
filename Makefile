@@ -14,6 +14,7 @@ SRCS = srcs/main.cpp \
 	srcs/handlers/StaticHandler.cpp \
 	srcs/handlers/CgiHandler.cpp \
 	srcs/handlers/DeleteHandler.cpp \
+	srcs/handlers/ErrorBuilder.cpp \
 
 
 OBJDIR = obj
