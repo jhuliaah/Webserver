@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/03 17:52:46 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/03 18:10:59 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/12 18:49:55 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,10 +20,14 @@ DeleteHandler::DeleteHandler() {}
 DeleteHandler::~DeleteHandler() {}
 		
 bool DeleteHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client){
-	(void)loc; //alterar quando tiver o location config pronto
-
-	//manter de modo estatico ate ter a parte da jhu
-	std::string filePath = "./www" + req.getUri();
+	// Use location root if provided, otherwise default to ./www
+	std::string root = loc.getRoot().empty() ? "./www" : loc.getRoot();
+	std::string uri = req.getUri();
+	if (!root.empty() && root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	if (uri.empty())
+		uri = "/";
+	std::string filePath = root + (uri[0] == '/' ? uri : std::string("/") + uri);
 	std::string finalResponse;
 	std::ostringstream responseStream;
 

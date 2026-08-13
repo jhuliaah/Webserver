@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/06 16:42:28 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 18:53:45 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -281,6 +281,14 @@ void Server::checkTimeouts() {
 					close(pipeFd);
 					_cgiPipes.erase(pipeFd);
 					client->getCgiContext().stdout_fd = -1;
+				}
+				
+				int pipeInFd = client->getCgiContext().stdin_fd;
+				if (pipeInFd != -1) {
+					epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeInFd, NULL);
+					close(pipeInFd);
+					_cgiWritePipes.erase(pipeInFd);
+					client->getCgiContext().stdin_fd = -1;
 				}
 				
 				std::string error504 = "HTTP/1.1 504 Gateway Timeout\r\nContent-Type: text/html\r\nContent-Length: 47\r\n\r\n<html><body><h1>504 Gateway Timeout</h1></body></html>";
