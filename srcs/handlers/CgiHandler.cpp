@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/06 15:29:29 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/12 18:48:04 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -68,7 +68,11 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, HttpResponse& respons
 bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client)
 {
 	(void)req;
-	(void)loc;
+	// use location config values (if present) to determine CGI interpreter and script
+	std::string interpreter = loc.getCgiPath().empty() ? "/usr/bin/python3" : loc.getCgiPath();
+	std::string scriptName = req.getUri();
+	if (!scriptName.empty() && scriptName[0] == '/')
+		scriptName = std::string(".") + scriptName; // make relative path like ./cgi-bin/script.py
 	int pipe_in[2]; // Servidor escreve [1] -> python le [0]
 	int pipe_out[2]; // python escreve [1] -> servidor le [0]
 
@@ -92,9 +96,9 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		close(pipe_in[0]);
 		close(pipe_out[1]);
 
-		char* scriptPath = (char*)"/usr/bin/python3";
-		char* scriptName = (char*)"./cgi-bin/script1.py";
-		char* argv[] = { scriptPath, scriptName, NULL};
+		char* scriptPath = const_cast<char*>(interpreter.c_str());
+		char* scriptNameArg = const_cast<char*>(scriptName.c_str());
+		char* argv[] = { scriptPath, scriptNameArg, NULL};
 		char** envp = CgiEnvBuilder(req);
 		execve(argv[0], argv, envp);
 		std::cerr << "CGI falhou no execve" << std::endl;

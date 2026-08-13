@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/06 15:26:59 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 17:23:10 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -45,11 +45,15 @@ class Client {
 
 		HttpRequest		_request;
 		CgiContext		_cgiContext;
-		size_t			_bytesSent;
 		long			_contentLength;
 		//norminette memories: typedef = _t, struct = _s, enum = _e
 
 		std::string _buildStaticResponse();
+
+		std::ifstream	_fileStream;
+		size_t			_fileSize;
+		size_t			_fileBytesSent;
+		bool			_isStreamingFile;
 
 	public:
 		Client(int fd);
@@ -68,6 +72,11 @@ class Client {
 		std::string&	getRawRequest() {return _rawRequest;}
 
 		void	setResponse(const std::string& res) { _response = res;}
+
+		bool startFileStream(const std::string& filePath, size_t fileSize);
+		bool isStreamingFile() const;
+		bool sendNextChunk();
+		void closeFileStream();
 };
 
 #endif

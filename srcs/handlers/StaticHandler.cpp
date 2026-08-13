@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/12 18:11:17 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 17:21:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,7 @@
 #include <sys/stat.h>
 #include <iostream>
 #include <fstream>
+#include <dirent.h>
 #include <sstream>
 
 StaticHandler::StaticHandler() {}
@@ -48,8 +49,11 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		}
 		else if (loc.getAutoindex() == true) {
 			std::cout << "[STATIC] Autoindex LIGADO! Listando pasta -> " << filePath << std::endl;
-			body = "<html><body><h1>Aqui vai nascer o Autoindex dinâmico!</h1></body></html>";
-			responseStream << "HTTP/1.1 200 OK\r\nContent-Type: text/html\r\nContent-Length: " << body.length() << "\r\n\r\n" << body;
+			body = buildAutoIndex(filePath, req.getUri());
+			responseStream << "HTTP/1.1 200 OK\r\n"
+							<< "Content-Type: text/html\r\n"
+							<< "Content-Length: " << body.length() << "\r\n\r\n" 
+							<< body;
 		}
 		else {
 			std::cout << "[STATIC] Erro 403: Autoindex desligado -> " << filePath << std::endl;
@@ -59,18 +63,14 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	}
 	// ficheiro comum
 	else {
-		std::cout << "[STATIC] Lendo ficheiro normal -> " << filePath << std::endl;
-		std::ifstream file(filePath.c_str(), std::ios::in | std::ios::binary);
-		if (file.is_open()) {
-			std::stringstream buffer;
-			buffer << file.rdbuf();
-			body = buffer.str();
-			file.close();
-			
-			responseStream << "HTTP/1.1 200 OK\r\n";
-			responseStream << "Content-Type: text/html\r\n";
-			responseStream << "Content-Length: " << body.length() << "\r\n\r\n";
-			responseStream << body;
+		std::cout << "[STATIC] A iniciar Stream por Chunks para -> " << filePath << " (" << path_stat.st_size << " bytes)" << std::endl;
+		responseStream << "HTTP/1.1 200 OK\r\n";
+		responseStream << "Content-Type: " << getMimeType(filePath) << "\r\n";
+		responseStream << "Content-Length: " << path_stat.st_size << "\r\n";
+		responseStream << "Connection: keep-alive\r\n\r\n";
+		if (client.startFileStream(filePath, path_stat.st_size) == true) {
+			client.setResponse(responseStream.str());
+			client.setState(Client::WRITING);
 		} else {
 			std::cout << "[STATIC] Erro 403: Sem permissão de leitura -> " << filePath << std::endl;
 			body = "<html><body><center><h1>403 Forbidden</h1></center></body></html>";
@@ -82,4 +82,47 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	return true;
 }
 
+std::string StaticHandler::buildAutoIndex(const std::string& path, const std::string& uri){
+	std::stringstream	html;
+	DIR					*dir;
+	struct dirent		*ent;
 
+	std::string safeUri = uri;
+	if (!safeUri.empty() && safeUri[safeUri.length() - 1] != '/') {
+		safeUri += "/";
+	}
+
+	html << "<!DOCTYPE html>\n<html>\n<head>\n<title>Index of " << safeUri << "</title>\n</head>\n<body>\n";
+	html << "<h1>Index of " << safeUri << "</h1>\n<hr>\n<pre>\n";
+
+	if ((dir = opendir(path.c_str())) != NULL){
+		while ((ent = readdir(dir)) != NULL) {
+			std::string filename = ent->d_name;
+			html << "<a href=\"" << safeUri << filename << "\">" << filename << "</a><br>\n";
+		}
+		closedir(dir);
+	} else {
+		html << "Erro: Nao foi possivel abrir o diretorio.\n";
+	}
+	html << "</pre>\n<hr>\n</body>\n</html>\n";
+	return html.str();
+}
+
+std::string StaticHandler::getMimeType(const std::string& path){
+	size_t dotPos = path.find_last_of(".");
+	if (dotPos == std::string::npos) {return "text/plain";}
+	
+	std::string ext = path.substr(dotPos);
+	if (ext == ".html" || ext == ".htm") return "text/html";
+	if (ext == ".css")  return "text/css";
+	if (ext == ".js")   return "text/javascript";
+	if (ext == ".png")  return "image/png";
+	if (ext == ".jpg"  || ext == ".jpeg") return "image/jpeg";
+	if (ext == ".gif")  return "image/gif";
+	if (ext == ".ico")  return "image/x-icon";
+	if (ext == ".mp4")  return "video/mp4";
+	if (ext == ".pdf")  return "application/pdf";
+	if (ext == ".json") return "application/json";
+
+	return "text/plain";
+}
