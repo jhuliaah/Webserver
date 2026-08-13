@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/26 15:32:55 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 17:39:05 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 19:15:48 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,7 +22,7 @@ int main(int argc, char* argv[]) {
 	aceitar com ou sem arquivo de configuracao.
 	agora só recusamos se vem mais de um arg. */
 
-	std::string configFile = "config_files/default/config";
+	std::string configFile = "config_files/default/config.conf";
 	if (argc == 2) { configFile = argv[1]; }
 	else if (argc > 2) {
 		std::cout << "EX{./webserv <config_file>}" << std::endl;

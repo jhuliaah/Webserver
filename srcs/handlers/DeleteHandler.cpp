@@ -6,11 +6,10 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/03 17:52:46 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/12 18:49:55 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 19:14:44 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../includes/WebServer.hpp"
 #include "../../includes/DeleteHandler.hpp"
 #include <unistd.h>
 #include <iostream>
