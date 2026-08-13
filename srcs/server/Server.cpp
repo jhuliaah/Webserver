@@ -270,7 +270,7 @@ void Server::checkTimeouts() {
         
 		if (client->getState() == Client::CGI_RUNNING) {
 			if (now - client->getCgiContext().startTime > 5) {
-				std::cout << "[TIMEOUT 504] CGI Script no fd " << clientFd << " travou. Matando processo!" << std::endl;
+				std::cout << "[TIMEOUT 504] CGI script on fd " << clientFd << " timed out. Killing process!" << std::endl;
 				if (client->getCgiContext().pid != -1){
 					kill(client->getCgiContext().pid, SIGKILL);
 				}
@@ -302,8 +302,8 @@ void Server::checkTimeouts() {
 			}
 			++it;
 		}
-        else if (client->isTimeout(now, 60)) { // 60 segundos
-            std::cout << "[CEIFADOR] Cliente no fd " << it->first << " expulso!" << std::endl;
+        else if (client->isTimeout(now, 60)) { // 60 seconds
+            std::cout << "[TIMEOUT] Client on fd " << it->first << " disconnected!" << std::endl;
             
             int fdToErase = it->first;
             ++it;
@@ -323,10 +323,10 @@ void Server::handleCgiRead(int pipeFd){
 
 	if (bytesRead > 0) {
 		client->getCgiContext().outputBuffer.append(buffer, bytesRead);
-		std::cout << "[cgi] Lidos " << bytesRead << " bytes do script Python" << std::endl;
+		std::cout << "[CGI] Read " << bytesRead << " bytes from the Python script" << std::endl;
 	}
 	else if (bytesRead == 0) {
-		std::cout << "[cgi] Python encerrou a execucao. Montando resposta final..." << std::endl;
+		std::cout << "[CGI] Python process finished. Building final response..." << std::endl;
 		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
 		close(pipeFd);
 		_cgiPipes.erase(pipeFd);
@@ -358,12 +358,12 @@ void Server::handleCgiWrite(int pipeFd) {
 
 		if (bytesWritten > 0) {
 			client->getCgiContext().inputSent += bytesWritten;
-			std::cout << "[CGI] Escritos " << bytesWritten << " bytes no tubo stdin do Python" << std::endl;			
+			std::cout << "[CGI] Wrote " << bytesWritten << " bytes to the Python stdin pipe" << std::endl;
 		} else if (bytesWritten < 0){ return; }
 	}
 	
 	if (client->getCgiContext().inputSent >= body.length()){
-		std::cout << "[CGI] Envio do Body concluido. Enviando EOF (close stdin_fd)!" << std::endl;
+		std::cout << "[CGI] Request body sent. Sending EOF to stdin pipe." << std::endl;
 
 		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
 		_cgiWritePipes.erase(pipeFd);

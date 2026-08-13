@@ -63,7 +63,7 @@ bool Client::readData() {
 		if (static_cast<long>(bodyReceived) < _contentLength)
 			return (false);
 
-		std::cout << "Complete requisition received in: " <<_fd << " fd" << std::endl;
+		std::cout << "Complete request received on fd: " << _fd << std::endl;
 		return (true);
     }
     else{

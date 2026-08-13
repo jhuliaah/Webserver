@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
 	std::string configFile = "config_files/default/config.conf";
 	if (argc == 2) { configFile = argv[1]; }
 	else if (argc > 2) {
-		std::cout << "EX{./webserv <config_file>}" << std::endl;
+		std::cout << "Usage: ./webserv <config_file>" << std::endl;
 		return 1;
 	}
 

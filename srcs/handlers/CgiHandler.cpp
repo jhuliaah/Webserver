@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/13 19:12:49 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 20:43:18 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -80,13 +80,13 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 	int pipe_out[2]; // python escreve [1] -> servidor le [0]
 
 	if (pipe(pipe_in) == -1 || pipe(pipe_out) == -1) {
-		std::cerr << "Erro ao criar pipes do CGI" << std::endl;
-		return true; //depois implementamos o erro 500
+		std::cerr << "Error creating CGI pipes" << std::endl;
+		return true; // TODO: implement 500 error later
 	}
 	pid_t pid = fork();
 
 	if (pid == -1) {
-		std::cerr << "Erro no fork do CGI" << std::endl;
+		std::cerr << "Error forking CGI process" << std::endl;
 		return true;
 	}
 
@@ -104,7 +104,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		char* argv[] = { scriptPath, scriptNameArg, NULL};
 		char** envp = CgiEnvBuilder(req);
 		execve(argv[0], argv, envp);
-		std::cerr << "CGI falhou no execve" << std::endl;
+		std::cerr << "CGI execve failed" << std::endl;
 		std::exit(1);
 	}
 	//processo pai (o servidor epoll)
@@ -129,7 +129,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		}
 
 		client.setState(Client::CGI_RUNNING);
-		std::cout << "[CGI] Disparado! PID: " << pid << " | FD Tubo: " << cgi.stdout_fd << std::endl;
+		std::cout << "[CGI] Started! PID: " << pid << " | stdout FD: " << cgi.stdout_fd << std::endl;
 		return false;
 	}
 }
