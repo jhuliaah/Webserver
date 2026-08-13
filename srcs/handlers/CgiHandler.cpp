@@ -6,15 +6,18 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/12 18:48:04 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 19:12:49 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/CgiHandler.hpp"
-#include "../../includes/WebServer.hpp"
 #include "../../includes/Client.hpp"
 
 #include <cstdlib>
+#include <cstring>
+#include <fcntl.h>
+#include <iostream>
+#include <unistd.h>
 
 
 CgiHandler::CgiHandler() {}

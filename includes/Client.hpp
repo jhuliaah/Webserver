@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 17:23:10 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 19:04:44 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,9 +46,6 @@ class Client {
 		HttpRequest		_request;
 		CgiContext		_cgiContext;
 		long			_contentLength;
-		//norminette memories: typedef = _t, struct = _s, enum = _e
-
-		std::string _buildStaticResponse();
 
 		std::ifstream	_fileStream;
 		size_t			_fileSize;
