@@ -6,11 +6,12 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/13 20:43:18 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 21:30:46 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "../../includes/CgiHandler.hpp"
+#include "../../includes/ErrorBuilder.hpp"
 #include "../../includes/Client.hpp"
 
 #include <cstdlib>
@@ -58,14 +59,16 @@ char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 	return envp;
 }
 
-void CgiHandler::parseCgiOutput(const std::string& buffer, HttpResponse& response)
+void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 {
-    (void)buffer;
-    (void)response;
-    
-    /* TODO */
-    /*  essa funçao vai tratar a saida do CGI e preencher o objeto HttpResponse 
-        que vive dentro do objeto Client, que o giHandler::handle() recebeu. */
+	std::string finalResponse;
+	if (buffer.empty()) {
+		finalResponse = ErrorBuilder::build(500, "");
+	} else {
+		finalResponse = "HTTP/1.1 200 OK\r\n" + buffer;
+	}
+	client.setResponse(finalResponse);
+	client.setState(Client::WRITING);
 }
 
 bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client)
