@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <map>
 
 class LocationConfig {
 	private:
@@ -15,6 +16,7 @@ class LocationConfig {
 		std::string					_cgi_path;
 		std::string					_returnPath;
 		int							_returnCode;
+		std::map<int, std::string>	_error_pages;
 
 	public:
 		LocationConfig();
@@ -30,6 +32,7 @@ class LocationConfig {
 		const std::string& getCgiPath() const { return _cgi_path; }
 		const std::string& getReturnPath() const { return _returnPath; }
 		int getReturnCode() const { return _returnCode; }
+		const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
 
 		// setters
 		void setPath(const std::string& v) { _path = v; }
@@ -40,7 +43,8 @@ class LocationConfig {
 		void setCgiExtension(const std::string& v) { _cgi_extension = v; }
 		void setCgiPath(const std::string& v) { _cgi_path = v; }
 		void setReturnPath(const std::string& v) { _returnPath = v; }
-		void setReturnCode(int v) { _returnCode = v; };
+		void setReturnCode(int v) { _returnCode = v; }
+		void setErrorPages(const std::map<int, std::string>& v) { _error_pages = v; }
 
 };
 #endif
