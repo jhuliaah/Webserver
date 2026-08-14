@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 19:04:44 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 21:26:30 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,6 +32,7 @@ class Client {
 			std::string outputBuffer;
 			size_t		inputSent;
 			time_t		startTime;
+			std::string	cgiOutput;
 
 			CgiContext() : pid(-1), stdin_fd(-1), stdout_fd(-1), inputSent(false), startTime(0) {}
 		};

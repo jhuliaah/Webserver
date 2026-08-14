@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:01:40 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 19:05:01 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/14 15:31:44 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,7 +35,7 @@ class Server{
 		void	handleNewConnection(int server_fd);
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
-		void	handleCgiRead(int pipeFd);
+		void	handleCgiOutput(int pipeFd);
 		void	handleCgiWrite(int pipeFd);
 
 		void removeClient(int fd);

@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 18:53:45 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/14 15:41:27 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -156,11 +156,17 @@ void Server::serverLoop(){
         for (int i = 0; i < numEvents; i++){
             int currentFd = events[i].data.fd;
 
+			if (_cgiPipes.find(currentFd) != _cgiPipes.end()) {
+                handleCgiOutput(currentFd); // O Python falou connosco!
+				continue;
+            }
+			if (_cgiWritePipes.find(currentFd) != _cgiWritePipes.end()) {
+				if (events[i].events & EPOLLOUT) {handleCgiWrite(currentFd);}
+				continue;
+			}
 			if (isServerFd(currentFd) && (events[i].events & EPOLLIN)) {
 				handleNewConnection(currentFd);
-			}
-			else if (_cgiPipes.count(currentFd) && (events[i].events & (EPOLLIN | EPOLLHUP | EPOLLERR))) {
-				handleCgiRead(currentFd);
+				continue;
 			}
 			else if (events[i].events & EPOLLIN) {
 				Client* client = _clients[currentFd];
@@ -188,62 +194,48 @@ void Server::serverLoop(){
 
                             // 2. Se a primeira palavra da requisição for DELETE
                             if (client->getRawRequest().find("DELETE") == 0) {
-                                DeleteHandler del;
-                                LocationConfig locMock;
-                                
-                                // O del.handle vai fazer o unlink() e mudar o estado para WRITING
-                                if (del.handle(client->getRequest(), locMock, *client) == true) {
-                                    // Avisamos o epoll que estamos prontos para cuspir a resposta na porta do cliente
-                                    struct epoll_event event;
-                                    event.events = EPOLLOUT;
-                                    event.data.fd = currentFd;
-                                    epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
-                                }
+								DeleteHandler del;
+								LocationConfig locMock;
+
+								// O del.handle vai fazer o unlink() e mudar o estado para WRITING
+								if (del.handle(client->getRequest(), locMock, *client) == true) {
+									// Avisamos o epoll que estamos prontos para cuspir a resposta na porta do cliente
+									struct epoll_event event;
+									event.events = EPOLLOUT;
+									event.data.fd = currentFd;
+									epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+								}
                             }
                             // 3. Se for GET ou POST, mandamos para o teu CGI maravilhoso
                             else {
-                                CgiHandler cgi;
-                                LocationConfig locMock;
-                                
-                                if (cgi.handle(client->getRequest(), locMock, *client) == false) {
-                                    // Tubo de LEITURA
-                                    int pipeOutFd = client->getCgiContext().stdout_fd;
-                                    _cgiPipes[pipeOutFd] = client;
-                                    struct epoll_event evRead;
-                                    evRead.events = EPOLLIN;
-                                    evRead.data.fd = pipeOutFd;
-                                    epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOutFd, &evRead);
-                                    
-                                    // Tubo de ESCRITA (Se existir)
-                                    int pipeInFd = client->getCgiContext().stdin_fd;
-                                    if (pipeInFd != -1) {
-                                        _cgiWritePipes[pipeInFd] = client;
-                                        struct epoll_event evWrite;
-                                        evWrite.events = EPOLLOUT;
-                                        evWrite.data.fd = pipeInFd;
-                                        epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeInFd, &evWrite);
-                                    }
-                                }
+								CgiHandler cgi;
+								LocationConfig locMock;
+
+								cgi.handle(client->getRequest(), locMock, *client);
+								if (client->getState() == Client::CGI_RUNNING) {
+									int pipeOut = client->getCgiContext().stdout_fd;
+									if (pipeOut != -1) {
+										struct epoll_event ev;
+										ev.events = EPOLLIN; // Queremos LER o que o Python escreve
+										ev.data.fd = pipeOut;
+										epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOut, &ev);
+										_cgiPipes[pipeOut] = client; // Guarda o mapeamento
+									}
+									
+									int pipeIn = client->getCgiContext().stdin_fd;
+									if (pipeIn != -1) {
+										struct epoll_event ev;
+										ev.events = EPOLLOUT; // Queremos ESCREVER para o Python (no caso de POST)
+										ev.data.fd = pipeIn;
+										epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeIn, &ev);
+										_cgiWritePipes[pipeIn] = client;
+									}
+								}
                             }
                             // ===========================================================
                         }
 				}
 			}
-                    // // Manda o Cliente ler os próprios dados
-                    // Client* client = _clients[currentFd];
-                    // if (client->readData() == true) {
-                        
-                    //     if (client->getState() == Client::CLOSED) {
-                    //         removeClient(currentFd);
-                    //     } 
-                    //     else if (client->getState() == Client::WRITING) {
-                    //         // O Cliente terminou de ler, muda para EPOLLOUT
-                    //         struct epoll_event event;
-                    //         event.events = EPOLLOUT;
-                    //         event.data.fd = currentFd;
-                    //         epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
-                    //     }
-					// }
 					else if (events[i].events & EPOLLOUT) {
 				if (_cgiWritePipes.count(currentFd)) {
                     handleCgiWrite(currentFd);
@@ -314,40 +306,6 @@ void Server::checkTimeouts() {
     }
 }
 
-void Server::handleCgiRead(int pipeFd){
-	Client*	client = _cgiPipes[pipeFd];
-	char	buffer[4096];
-
-	std::memset(buffer, 0, sizeof(buffer));
-	int		bytesRead = read(pipeFd, buffer, sizeof(buffer) -1);
-
-	if (bytesRead > 0) {
-		client->getCgiContext().outputBuffer.append(buffer, bytesRead);
-		std::cout << "[CGI] Read " << bytesRead << " bytes from the Python script" << std::endl;
-	}
-	else if (bytesRead == 0) {
-		std::cout << "[CGI] Python process finished. Building final response..." << std::endl;
-		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
-		close(pipeFd);
-		_cgiPipes.erase(pipeFd);
-
-		client->setResponse(client->getCgiContext().outputBuffer);
-		client->setState(Client::WRITING);
-		
-		struct epoll_event event;
-		event.events = EPOLLOUT;
-		event.data.fd = client->getFd();
-		epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
-		
-		waitpid(client->getCgiContext().pid, NULL, WNOHANG);
-		client->getCgiContext().pid = -1;
-		client->getCgiContext().stdout_fd = -1;
-	}
-	else {
-		return ;
-	}
-}
-
 void Server::handleCgiWrite(int pipeFd) {
 	Client* client = _cgiWritePipes[pipeFd];
 	const std::string& body = client->getRequest().getBody();
@@ -370,5 +328,30 @@ void Server::handleCgiWrite(int pipeFd) {
 
 		close(pipeFd);
 		client->getCgiContext().stdin_fd = -1;
+	}
+}
+
+void Server::handleCgiOutput(int pipeFd) {
+	Client* client = _cgiPipes[pipeFd];
+	char buffer[4096];
+
+	int bytesRead = read(pipeFd, buffer, sizeof(buffer) - 1);
+	if (bytesRead > 0) {
+		buffer[bytesRead] = '\0';
+		client->getCgiContext().cgiOutput.append(buffer, bytesRead);
+	}
+	else if (bytesRead == 0) {
+		std::cout << "[CGI] Python process finished. Building final response..." << std::endl;
+		
+		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+		close(pipeFd);
+		_cgiPipes.erase(pipeFd);
+
+		CgiHandler::parseCgiOutput(client->getCgiContext().cgiOutput, *client);
+		
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = client->getFd();
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
 	}
 }
