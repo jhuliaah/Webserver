@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 20:40:32 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/08/13 20:53:24 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,6 +17,7 @@
 #include <fstream>
 #include <dirent.h>
 #include <sstream>
+#include <map>
 
 StaticHandler::StaticHandler() {}
 
@@ -35,8 +36,12 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	// O Ficheiro/Pasta existe?
 	if (stat(filePath.c_str(), &path_stat) != 0){
 		std::cout << "[STATIC] Error 404: not found -> " << filePath << std::endl;
-		std::string errorPath = ""; // loc.getErrorPage(404); (to be adjusted with the config getter name)
-		client.setResponse(ErrorBuilder::build(404, errorPath));
+		std::string customErrorPage = "";
+		const std::map<int, std::string>& errorPages = loc.getErrorPages();
+		if (errorPages.find(404) != errorPages.end()) {
+			customErrorPage = errorPages.find(404)->second;
+		}
+		client.setResponse(ErrorBuilder::build(404, customErrorPage));
 		client.setState(Client::WRITING);
 		return true;
 	}
@@ -60,8 +65,12 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		}
 		else {
 			std::cout << "[STATIC] Error 403: autoindex disabled -> " << filePath << std::endl;
-			std::string errorPath = "";
-			client.setResponse(ErrorBuilder::build(403, errorPath));
+			std::string customErrorPage = "";
+			const std::map<int, std::string>& errorPages = loc.getErrorPages();
+			if (errorPages.find(403) != errorPages.end()) {
+				customErrorPage = errorPages.find(403)->second;
+			}
+			client.setResponse(ErrorBuilder::build(403, customErrorPage));
 			client.setState(Client::WRITING);
 			return true;
 		}
@@ -78,8 +87,12 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			client.setState(Client::WRITING);
 		} else {
 			std::cout << "[STATIC] Error 403: no read permission -> " << filePath << std::endl;
-			std::string errorPath = "";
-			client.setResponse(ErrorBuilder::build(403, errorPath));
+			std::string customErrorPage = "";
+			const std::map<int, std::string>& errorPages = loc.getErrorPages();
+			if (errorPages.find(403) != errorPages.end()) {
+				customErrorPage = errorPages.find(403)->second;
+			}
+			client.setResponse(ErrorBuilder::build(403, customErrorPage));
 			client.setState(Client::WRITING);
 			return true;
 		}

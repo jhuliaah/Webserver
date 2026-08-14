@@ -4,7 +4,7 @@
 
 /* Converte a struct ParsedLocation (mundo do ConfigParser/ConfigTypes.hpp)
 para a classe LocationConfig (mundo do Router/Server/StaticHandler). */
-static LocationConfig toLocationConfig(const ParsedLocation &src)
+static LocationConfig toLocationConfig(const ParsedLocation &src, const std::map<int, std::string> &errorPages)
 {
 	LocationConfig loc;
 
@@ -17,6 +17,7 @@ static LocationConfig toLocationConfig(const ParsedLocation &src)
 	loc.setCgiPath(src.cgiPath);
 	loc.setReturnCode(src.redirectCode);
 	loc.setReturnPath(src.redirect);
+	loc.setErrorPages(errorPages);
 	return loc;
 }
 
@@ -34,7 +35,7 @@ static ServerConfig toServerConfigClass(const ParsedServer &src)
 	server.setMaxBodySize(src.clientMaxBodySize);
 	server.setErrorPages(src.errorPages);
 	for (size_t i = 0; i < src.locations.size(); i++)
-		server.addLocation(toLocationConfig(src.locations[i]));
+		server.addLocation(toLocationConfig(src.locations[i], src.errorPages));
 	return server;
 }
 
