@@ -39,6 +39,7 @@ class Client {
 
 	private:
 		int				_fd;
+		int				_serverFd;
 		time_t			_lastActivity;
 		std::string		_rawRequest;
 		std::string		_response;
@@ -64,6 +65,8 @@ class Client {
 		int		getFd() const { return _fd; }
 		State	getState() const { return _state_e; }
 		void	setState(State state) {_state_e = state;}
+		int  getServerFd() const { return _serverFd; }
+    	void setServerFd(int fd) { _serverFd = fd; }
 
 		CgiContext& getCgiContext() {return _cgiContext;}
 		HttpRequest& getRequest() {return _request;}

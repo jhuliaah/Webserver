@@ -23,7 +23,7 @@
 /*Rafael, não sei onde, mas seu client em algum momento vai precisar checar
 o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client.*/
 
-Client::Client(int fd) : _fd(fd), _state_e(READING), _contentLength(-1) {
+Client::Client(int fd) : _fd(fd), _state_e(READING), _serverFd(-1), _contentLength(-1) {
     _lastActivity = time(NULL);
 }
 

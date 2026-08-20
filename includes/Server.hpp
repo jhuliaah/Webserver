@@ -31,6 +31,7 @@ class Server{
 		std::map<int, Client*>		_cgiPipes;
 		std::map<int, Client*>		_cgiWritePipes;
 		Config						_config;
+		
 
 		void	handleNewConnection(int server_fd);
 		bool	isServerFd(int fd);
@@ -39,6 +40,9 @@ class Server{
 		void	handleCgiWrite(int pipeFd);
 
 		void removeClient(int fd);
+
+		void dispatchRequest(int currentFd, Client* client);
+		const ServerConfig& findServerConfig(int serverFd) const;
 
 		Server();				// virou private, so cria server com config.
 

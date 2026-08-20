@@ -119,7 +119,25 @@ void Server::handleNewConnection(int serverFd){
     }
     
     _clients[clientFd] = new Client(clientFd);
+    _clients[clientFd]->setServerFd(serverFd);
     std::cout << "New client connected on fd: " << clientFd << std::endl;
+}
+
+/*
+	Acha o ServerConfig (o "server{}" do config file) que corresponde ao
+	socket de listen que aceitou esse client. _serverFds e _config.getServers()
+	são preenchidos juntos, na mesma ordem, dentro de initServer().
+*/
+const ServerConfig& Server::findServerConfig(int serverFd) const
+{
+	const std::vector<ServerConfig>& servers = _config.getServers();
+
+	for (size_t i = 0; i < _serverFds.size(); i++)
+	{
+		if (_serverFds[i] == serverFd)
+			return servers[i];
+	}
+	return servers[0]; // fallback: não devia acontecer, mas evita crash
 }
 
 void Server::removeClient(int fd) {
@@ -143,6 +161,115 @@ void Server::removeClient(int fd) {
     close(fd);
     delete client;
     _clients.erase(fd);
+}
+
+/*
+	Extrai method e uri da request line ("GET /foo HTTP/1.1\r\n...").
+	Isso NÃO é o HttpParser de verdade (Fase 1 do roadmap, ainda não feito
+	— headers e body continuam sem parsing real). É só o mínimo pra
+	conseguir rotear: sem method/uri reais, Router::matchLoc/classify não
+	têm o que checar.
+*/
+static void parseRequestLine(Client* client)
+{
+	const std::string& raw = client->getRawRequest();
+	size_t lineEnd = raw.find("\r\n");
+	std::string requestLine = (lineEnd != std::string::npos) ? raw.substr(0, lineEnd) : raw;
+
+	size_t sp1 = requestLine.find(' ');
+	size_t sp2 = (sp1 != std::string::npos) ? requestLine.find(' ', sp1 + 1) : std::string::npos;
+
+	if (sp1 == std::string::npos || sp2 == std::string::npos)
+		return; // request line malformada, deixa method/uri vazios (Fase 1 vai tratar como 400)
+
+	client->getRequest().setMethod(requestLine.substr(0, sp1));
+	client->getRequest().setUri(requestLine.substr(sp1 + 1, sp2 - sp1 - 1));
+}
+
+/*
+	Monta o path real no disco (root da location + uri), evitando barra
+	dupla quando o root já termina em "/" (ex.: "./www/" + "/cgi-bin/x.py").
+*/
+static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig& server, const std::string& uri)
+{
+	std::string root = loc.getRoot().empty() ? server.getRoot() : loc.getRoot();
+	if (root.empty())
+		root = "./www";
+	if (!root.empty() && root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	return root + uri;
+}
+
+void Server::dispatchRequest(int currentFd, Client* client)
+{
+	parseRequestLine(client);
+
+	const ServerConfig& serverConfig = findServerConfig(client->getServerFd());
+	const std::string& method = client->getRequest().getMethod();
+	const std::string& uri = client->getRequest().getUri();
+
+	LocationConfig loc = Router::matchLoc(serverConfig, uri);
+	std::string filePath = resolveFilePath(loc, serverConfig, uri);
+	RouteType type = Router::classify(loc, filePath, method);
+
+	bool readyToWrite = false;
+
+	if (type == ERROR)
+	{
+		// método não permitido na location -> 405
+		std::string customErrorPage = "";
+		const std::map<int, std::string>& errorPages = loc.getErrorPages();
+		if (errorPages.find(405) != errorPages.end())
+			customErrorPage = errorPages.find(405)->second;
+		client->setResponse(ErrorBuilder::build(405, customErrorPage));
+		client->setState(Client::WRITING);
+		readyToWrite = true;
+	}
+	else if (type == CGI)
+	{
+		CgiHandler cgi;
+		cgi.handle(client->getRequest(), loc, *client);
+		if (client->getState() == Client::CGI_RUNNING)
+		{
+			int pipeOut = client->getCgiContext().stdout_fd;
+			if (pipeOut != -1)
+			{
+				struct epoll_event ev;
+				ev.events = EPOLLIN; // Queremos LER o que o CGI escreve
+				ev.data.fd = pipeOut;
+				epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOut, &ev);
+				_cgiPipes[pipeOut] = client;
+			}
+
+			int pipeIn = client->getCgiContext().stdin_fd;
+			if (pipeIn != -1)
+			{
+				struct epoll_event ev;
+				ev.events = EPOLLOUT; // Queremos ESCREVER pro CGI (POST)
+				ev.data.fd = pipeIn;
+				epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeIn, &ev);
+				_cgiWritePipes[pipeIn] = client;
+			}
+		}
+	}
+	else if (method == "DELETE")
+	{
+		DeleteHandler del;
+		readyToWrite = del.handle(client->getRequest(), loc, *client);
+	}
+	else // STATIC ou DIR -> StaticHandler decide (index/autoindex/404/etc)
+	{
+		StaticHandler st;
+		readyToWrite = st.handle(client->getRequest(), loc, *client);
+	}
+
+	if (readyToWrite)
+	{
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+	}
 }
 
 void Server::serverLoop(){
@@ -170,70 +297,14 @@ void Server::serverLoop(){
 			}
 			else if (events[i].events & EPOLLIN) {
 				Client* client = _clients[currentFd];
-				client->getRequest().setMethod("POST");
-				client->getRequest().setBody("Mensagem Secreta do Rafael para o Python!");
-				client->getRequest().addHeader("Content-Length", "41");
 
 				if (client->readData() == true) {
 					if (client->getState() == Client::CLOSED) {
 						removeClient(currentFd);
 					}
-						else {
-                            // ===========================================================
-                            // MINI-ROUTER TEMPORÁRIO PARA TESTES
-                            // ===========================================================
-                            
-                            // 1. Extração "Pobre" da URI (A Jhulia fará isto de forma segura no Parser)
-                            // Pega no que está entre o '/' e o ' HTTP/1.1'
-                            size_t start = client->getRawRequest().find("/");
-                            size_t end = client->getRawRequest().find(" ", start);
-                            if (start != std::string::npos && end != std::string::npos) {
-                                std::string uri = client->getRawRequest().substr(start, end - start);
-                                client->getRequest().setUri(uri);
-                            }
-
-                            // 2. Se a primeira palavra da requisição for DELETE
-                            if (client->getRawRequest().find("DELETE") == 0) {
-								DeleteHandler del;
-								LocationConfig locMock;
-
-								// O del.handle vai fazer o unlink() e mudar o estado para WRITING
-								if (del.handle(client->getRequest(), locMock, *client) == true) {
-									// Avisamos o epoll que estamos prontos para cuspir a resposta na porta do cliente
-									struct epoll_event event;
-									event.events = EPOLLOUT;
-									event.data.fd = currentFd;
-									epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
-								}
-                            }
-                            // 3. Se for GET ou POST, mandamos para o teu CGI maravilhoso
-                            else {
-								CgiHandler cgi;
-								LocationConfig locMock;
-
-								cgi.handle(client->getRequest(), locMock, *client);
-								if (client->getState() == Client::CGI_RUNNING) {
-									int pipeOut = client->getCgiContext().stdout_fd;
-									if (pipeOut != -1) {
-										struct epoll_event ev;
-										ev.events = EPOLLIN; // Queremos LER o que o Python escreve
-										ev.data.fd = pipeOut;
-										epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeOut, &ev);
-										_cgiPipes[pipeOut] = client; // Guarda o mapeamento
-									}
-									
-									int pipeIn = client->getCgiContext().stdin_fd;
-									if (pipeIn != -1) {
-										struct epoll_event ev;
-										ev.events = EPOLLOUT; // Queremos ESCREVER para o Python (no caso de POST)
-										ev.data.fd = pipeIn;
-										epoll_ctl(_epollFd, EPOLL_CTL_ADD, pipeIn, &ev);
-										_cgiWritePipes[pipeIn] = client;
-									}
-								}
-                            }
-                            // ===========================================================
-                        }
+					else {
+						dispatchRequest(currentFd, client);
+					}
 				}
 			}
 					else if (events[i].events & EPOLLOUT) {
