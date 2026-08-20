@@ -9,28 +9,29 @@ Router::~Router()
 {
 }
 
+L
 LocationConfig Router::matchLoc(ServerConfig server, std::string uri)
 {
-    const std::vector<LocationConfig>& locations = server.getLocation();
+    const std::vector<LocationConfig>& locations = server.getLocations();
     const LocationConfig* best = NULL;
     size_t bestLen = 0;
 
     for (size_t i = 0; i < locations.size(); i++)
     {
-        const std::string& locPath = locations[i]. getPath();
+        const std::string& locPath = locations[i].getPath();
         if (locPath.empty())
             continue;
         if (uri.compare(0, locPath.size(), locPath) != 0)
             continue;
 
-        bool boundary0k = false;
-        if (uri.size() == locPath.size());
-            boundary0k = true;
+        bool boundaryOk = false;
+        if (uri.size() == locPath.size())
+            boundaryOk = true;
         else if (locPath[locPath.size() - 1] == '/')
-            boundary0k = true;
-        else if (locPath[locPath.size()] == '/')
-            boundary0k = true;
-        if (!boundary0k)
+            boundaryOk = true;
+        else if (uri[locPath.size()] == '/')
+            boundaryOk = true;
+        if (!boundaryOk)
             continue;
 
         if (locPath.size() > bestLen)
@@ -50,7 +51,7 @@ RouteType Router::classify(LocationConfig loc, std::string path, std::string met
     if (!methods.empty())
     {
         bool allowed = false;
-        for (size_t i = 0; i < methods.size(), i++)
+        for (size_t i = 0; i < methods.size(); i++)
         {
             if (methods[i] == method)
             {
@@ -73,5 +74,5 @@ RouteType Router::classify(LocationConfig loc, std::string path, std::string met
     struct stat pathStat;
     if (stat(path.c_str(), &pathStat) == 0 && S_ISDIR(pathStat.st_mode))
         return DIR;
-    return STATIC;    
+    return STATIC;
 }
