@@ -9,7 +9,7 @@ Router::~Router()
 {
 }
 
-L
+
 LocationConfig Router::matchLoc(ServerConfig server, std::string uri)
 {
     const std::vector<LocationConfig>& locations = server.getLocations();

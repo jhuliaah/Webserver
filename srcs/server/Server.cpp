@@ -15,6 +15,8 @@
 #include "../../includes/Router.hpp"
 #include "../../includes/Exeptions.hpp"
 #include "../../includes/DeleteHandler.hpp"
+#include "../../includes/StaticHandler.hpp"
+#include "../../includes/ErrorBuilder.hpp"
 
 #include <arpa/inet.h>		// inet_addr
 #include <fcntl.h>			// fcntl, F_SETFL, O_NONBLOCK
