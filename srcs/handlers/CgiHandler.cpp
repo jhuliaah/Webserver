@@ -12,6 +12,7 @@
 
 #include "../../includes/CgiHandler.hpp"
 #include "../../includes/ErrorBuilder.hpp"
+#include "../../includes/HttpResponse.hpp"
 #include "../../includes/Client.hpp"
 
 #include <cstdlib>
@@ -59,15 +60,88 @@ char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 	return envp;
 }
 
+/*
+	Monta a resposta HTTP a partir do que o script CGI escreveu no stdout.
+
+	Dois formatos aceitos:
+	1) O script já manda a status line HTTP inteira por conta própria
+	   (ex.: os scripts de teste em cgi-bin/, que começam com
+	   "HTTP/1.1 200 OK\r\n..."). Nesse caso repassa direto -- prefixar
+	   outra status line por cima duplicava a linha e quebrava o response.
+	2) Formato CGI/1.1 "de verdade": só headers ("Chave: valor", um por
+	   linha), linha em branco, body -- sem status line. Se o script
+	   mandar um header "Status: 404 Not Found", esse vira o status code
+	   da resposta; sem "Status:", o padrão é 200. Aceita tanto "\r\n\r\n"
+	   quanto só "\n\n" como separador de headers/body, porque scripts
+	   simples com print() só mandam "\n".
+*/
 void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 {
-	std::string finalResponse;
-	if (buffer.empty()) {
-		finalResponse = ErrorBuilder::build(500, "");
-	} else {
-		finalResponse = "HTTP/1.1 200 OK\r\n" + buffer;
+	if (buffer.empty())
+	{
+		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setState(Client::WRITING);
+		return;
 	}
-	client.setResponse(finalResponse);
+
+	if (buffer.compare(0, 5, "HTTP/") == 0)
+	{
+		client.setResponse(buffer);
+		client.setState(Client::WRITING);
+		return;
+	}
+
+	size_t sepPos = buffer.find("\r\n\r\n");
+	size_t sepLen = 4;
+	if (sepPos == std::string::npos)
+	{
+		sepPos = buffer.find("\n\n");
+		sepLen = 2;
+	}
+
+	HttpResponse res;
+	res.status_code = 200;
+
+	if (sepPos == std::string::npos)
+	{
+		// Não achou fim de headers -> trata tudo como body cru.
+		res.headers["Content-Type"] = "text/html";
+		res.body = buffer;
+		client.setResponse(res.serialize());
+		client.setState(Client::WRITING);
+		return;
+	}
+
+	std::string headerBlock = buffer.substr(0, sepPos);
+	std::string body = buffer.substr(sepPos + sepLen);
+	std::string lineSep = (headerBlock.find("\r\n") != std::string::npos) ? "\r\n" : "\n";
+
+	size_t pos = 0;
+	while (pos < headerBlock.size())
+	{
+		size_t lineEnd = headerBlock.find(lineSep, pos);
+		std::string line = (lineEnd == std::string::npos)
+			? headerBlock.substr(pos)
+			: headerBlock.substr(pos, lineEnd - pos);
+		pos = (lineEnd == std::string::npos) ? headerBlock.size() : lineEnd + lineSep.size();
+
+		size_t colon = line.find(':');
+		if (colon == std::string::npos)
+			continue; // linha sem ":" -> ignora, não é header válido
+
+		std::string key = line.substr(0, colon);
+		std::string value = line.substr(colon + 1);
+		size_t valueStart = value.find_first_not_of(' ');
+		value = (valueStart == std::string::npos) ? "" : value.substr(valueStart);
+
+		if (key == "Status")
+			res.status_code = std::atoi(value.c_str()); // "404 Not Found" -> 404
+		else
+			res.headers[key] = value;
+	}
+
+	res.body = body;
+	client.setResponse(res.serialize());
 	client.setState(Client::WRITING);
 }
 

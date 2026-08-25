@@ -47,18 +47,46 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	// pasta comum
 	else if (S_ISDIR(path_stat.st_mode)){
 		std::string indexFile = loc.getIndex();
+		std::string indexPath = filePath;
+		if (!indexPath.empty() && indexPath[indexPath.length() - 1] != '/')
+			indexPath += "/";
+		indexPath += indexFile;
 
-		if(!indexFile.empty()) {
-			std::cout << "[STATIC] Redirecting to configured index: " << indexFile << std::endl;
-			filePath += (filePath[filePath.length() - 1] == '/' ? "" : "/") + indexFile;
+		struct stat indexStat;
+		bool indexExists = (!indexFile.empty()
+			&& stat(indexPath.c_str(), &indexStat) == 0
+			&& S_ISREG(indexStat.st_mode));
 
-			HttpResponse res;
-			res.status_code = 200;
-			res.headers["Content-Type"] = "text/html";
-			res.body = "<html><body><h1>Index loaded successfully from config!</h1></body></html>";
-			client.setResponse(res.serialize());
-			client.setState(Client::WRITING);
-			return true;
+		if (indexExists) {
+			std::cout << "[STATIC] Serving configured index: " << indexPath << std::endl;
+
+			if (client.startFileStream(indexPath, indexStat.st_size) == true) {
+				HttpResponse res;
+				res.status_code = 200;
+				res.headers["Content-Type"] = getMimeType(indexPath);
+				res.headers["Connection"] = "keep-alive";
+
+				// mesmo raciocínio do "ficheiro comum" lá embaixo:
+				// Content-Length explícito porque o body de verdade vai
+				// em chunks via startFileStream/sendNextChunk, não aqui.
+				std::ostringstream lenStream;
+				lenStream << indexStat.st_size;
+				res.headers["Content-Length"] = lenStream.str();
+
+				client.setResponse(res.serialize());
+				client.setState(Client::WRITING);
+				return true;
+			} else {
+				std::cout << "[STATIC] Error 403: no read permission -> " << indexPath << std::endl;
+				std::string customErrorPage = "";
+				const std::map<int, std::string>& errorPages = loc.getErrorPages();
+				if (errorPages.find(403) != errorPages.end()) {
+					customErrorPage = errorPages.find(403)->second;
+				}
+				client.setResponse(ErrorBuilder::build(403, customErrorPage));
+				client.setState(Client::WRITING);
+				return true;
+			}
 		}
 		else if (loc.getAutoindex() == true) {
 			std::cout << "[STATIC] Autoindex enabled. Listing directory -> " << filePath << std::endl;
@@ -93,7 +121,10 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			res.headers["Content-Type"] = getMimeType(filePath);
 			res.headers["Connection"] = "keep-alive";
 
-			Content-Length e não tenta preencher um body vazio por cima.
+			// Content-Length explícito de propósito: o body de verdade NÃO
+			// vai aqui dentro, ele é mandado depois em pedaços via
+			// startFileStream/sendNextChunk. O serialize() respeita esse
+			// Content-Length e não tenta preencher um body vazio por cima.
 			std::ostringstream lenStream;
 			lenStream << path_stat.st_size;
 			res.headers["Content-Length"] = lenStream.str();
