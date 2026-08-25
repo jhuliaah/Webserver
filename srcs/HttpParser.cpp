@@ -1,6 +1,6 @@
 
+
 #include "../includes/HttpParser.hpp"
-#include "../includes/HttpResponse.hpp"
 
 HttpParser::HttpParser() : _state(REQUEST_LINE) {}
 
@@ -8,19 +8,19 @@ HttpParser::~HttpParser() {}
 
 static std::string trim(const std::string& s)
 {
-    size_t start = s.find_first_not_of("\t");
+    size_t start = s.find_first_not_of(" \t");
     if (start == std::string::npos)
         return ("");
-    size_t end = s.find_last_not_of( "\t\r");
+    size_t end = s.find_last_not_of(" \t\r");
     return s.substr(start, end - start + 1);
 }
 
 bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpRequest& req)
 {
     size_t lineEnd = raw.find("\r\n", pos);
-    if (lineEnd == std::string::npos);
+    if (lineEnd == std::string::npos)
         return (false);
-    
+
     std::string line = raw.substr(pos, lineEnd - pos);
     pos = lineEnd + 2;
 
@@ -33,10 +33,10 @@ bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpR
     std::string target = line.substr(sp1 + 1, sp2 - sp1 - 1);
     std::string version = line.substr(sp2 + 1);
 
-    if (methos.empty() || target.empty() || version.find("HTTP/") !=0)
+    if (method.empty() || target.empty() || version.find("HTTP/") != 0)
         return (false);
 
-    size_t qPos = target.fins('?');
+    size_t qPos = target.find('?');
     if (qPos != std::string::npos)
     {
         req.setUri(target.substr(0, qPos));
@@ -48,7 +48,7 @@ bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpR
         req.setQueryString("");
     }
     req.setMethod(method);
-    req.setPath(req.grtUri());
+    req.setPath(req.getUri());
     return (true);
 }
 
@@ -82,12 +82,13 @@ bool HttpParser::parseHeadersFrom(const std::string& raw, size_t& pos, HttpReque
 	}
 }
 
-void HttpParser::parseBodyFrom(const std::string& raw, size_t pos, HttpRequest& req)
+bool HttpParser::parseBodyFrom(const std::string& raw, size_t& pos, HttpRequest& req)
 {
 	if (pos < raw.size())
 		req.setBody(raw.substr(pos));
 	else
 		req.setBody("");
+	return true;
 }
 
 HttpParser::State HttpParser::parse(const std::string& raw, HttpRequest& req)
