@@ -166,33 +166,7 @@ void Server::removeClient(int fd) {
     _clients.erase(fd);
 }
 
-/*
-	Extrai method e uri da request line ("GET /foo HTTP/1.1\r\n...").
-	Isso NÃO é o HttpParser de verdade (Fase 1 do roadmap, ainda não feito
-	— headers e body continuam sem parsing real). É só o mínimo pra
-	conseguir rotear: sem method/uri reais, Router::matchLoc/classify não
-	têm o que checar.
-*/
-static void parseRequestLine(Client* client)
-{
-	const std::string& raw = client->getRawRequest();
-	size_t lineEnd = raw.find("\r\n");
-	std::string requestLine = (lineEnd != std::string::npos) ? raw.substr(0, lineEnd) : raw;
 
-	size_t sp1 = requestLine.find(' ');
-	size_t sp2 = (sp1 != std::string::npos) ? requestLine.find(' ', sp1 + 1) : std::string::npos;
-
-	if (sp1 == std::string::npos || sp2 == std::string::npos)
-		return; // request line malformada, deixa method/uri vazios (Fase 1 vai tratar como 400)
-
-	client->getRequest().setMethod(requestLine.substr(0, sp1));
-	client->getRequest().setUri(requestLine.substr(sp1 + 1, sp2 - sp1 - 1));
-}
-
-/*
-	Monta o path real no disco (root da location + uri), evitando barra
-	dupla quando o root já termina em "/" (ex.: "./www/" + "/cgi-bin/x.py").
-*/
 static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig& server, const std::string& uri)
 {
 	std::string root = loc.getRoot().empty() ? server.getRoot() : loc.getRoot();
