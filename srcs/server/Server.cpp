@@ -17,6 +17,7 @@
 #include "../../includes/DeleteHandler.hpp"
 #include "../../includes/StaticHandler.hpp"
 #include "../../includes/ErrorBuilder.hpp"
+#include "../../includes/HttpParser.hpp"
 
 #include <arpa/inet.h>		// inet_addr
 #include <fcntl.h>			// fcntl, F_SETFL, O_NONBLOCK
@@ -204,7 +205,21 @@ static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig
 
 void Server::dispatchRequest(int currentFd, Client* client)
 {
-	parseRequestLine(client);
+	HttpParser parser;
+	HttpParser::State parseState = parser.parse(client->getRawRequest(), client->getRequest());
+
+	if (parseState == HttpParser::ERROR)
+	{
+		// request line ou headers malformados -> 400, nem tenta rotear
+		client->setResponse(ErrorBuilder::build(400, ""));
+		client->setState(Client::WRITING);
+
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+		return;
+	}
 
 	const ServerConfig& serverConfig = findServerConfig(client->getServerFd());
 	const std::string& method = client->getRequest().getMethod();
