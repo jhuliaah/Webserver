@@ -17,6 +17,7 @@
 # include "Client.hpp"
 # include "LocationConfig.hpp"
 # include <string>
+#include "UploadHandler.hpp"
 
 class DeleteHandler {
 	public:

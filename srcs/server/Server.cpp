@@ -179,6 +179,22 @@ static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig
 
 void Server::dispatchRequest(int currentFd, Client* client)
 {
+	
+	const std::string& body = client->getRequest().getBody();
+	if (!body.empty() && body.size() > serverConfig.getMaxBodySize())
+	{
+		std::cout << "[DISPATCH] Body too large: " << body.size()
+			<< " > " << serverConfig.getMaxBodySize() << std::endl;
+		client->setResponse(ErrorBuilder::build(413, ""));
+		client->setState(Client::WRITING);
+
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+		return;
+	}
+
 	HttpParser parser;
 	HttpParser::State parseState = parser.parse(client->getRawRequest(), client->getRequest());
 
@@ -247,6 +263,11 @@ void Server::dispatchRequest(int currentFd, Client* client)
 	{
 		DeleteHandler del;
 		readyToWrite = del.handle(client->getRequest(), loc, *client);
+	}
+	else if (method == "POST")
+	{
+		UploadHandler upload;
+		readyToWrite = upload.handle(client->getRequest(), loc, *client);
 	}
 	else // STATIC ou DIR -> StaticHandler decide (index/autoindex/404/etc)
 	{

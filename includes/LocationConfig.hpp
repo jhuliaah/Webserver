@@ -47,4 +47,5 @@ class LocationConfig {
 		void setErrorPages(const std::map<int, std::string>& v) { _error_pages = v; }
 
 };
+
 #endif
