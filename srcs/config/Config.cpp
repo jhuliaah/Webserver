@@ -15,6 +15,7 @@ static LocationConfig toLocationConfig(const ParsedLocation &src, const ParsedSe
 	loc.setCgiPath(src.cgiPath);
 	loc.setReturnCode(src.redirectCode);
 	loc.setReturnPath(src.redirect);
+	loc.setUploadDir(src.uploadDir);
 	loc.setErrorPages(parent.errorPages);
 	return loc;
 }

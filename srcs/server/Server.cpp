@@ -34,14 +34,6 @@
 #include <sys/wait.h>
 #include "../../includes/CgiHandler.hpp"
 
-/* 
-O Router vai ser usado MAIS OU MENOS assim em Server.cpp, como utility class:
-LocationConfig loc = Router::matchLoc(ServerConfig, uri);
-RouteType type = Router::classify(loc, path, method);
-IRequestHandler *handler = makeHandler(type);
-bool done = handler->handle(req, *loc, client);
-delete handler;																*/
-
 //================================
 //			Constructors		//
 //================================
@@ -179,22 +171,6 @@ static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig
 
 void Server::dispatchRequest(int currentFd, Client* client)
 {
-	
-	const std::string& body = client->getRequest().getBody();
-	if (!body.empty() && body.size() > serverConfig.getMaxBodySize())
-	{
-		std::cout << "[DISPATCH] Body too large: " << body.size()
-			<< " > " << serverConfig.getMaxBodySize() << std::endl;
-		client->setResponse(ErrorBuilder::build(413, ""));
-		client->setState(Client::WRITING);
-
-		struct epoll_event event;
-		event.events = EPOLLOUT;
-		event.data.fd = currentFd;
-		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
-		return;
-	}
-
 	HttpParser parser;
 	HttpParser::State parseState = parser.parse(client->getRawRequest(), client->getRequest());
 
@@ -214,6 +190,23 @@ void Server::dispatchRequest(int currentFd, Client* client)
 	const ServerConfig& serverConfig = findServerConfig(client->getServerFd());
 	const std::string& method = client->getRequest().getMethod();
 	const std::string& uri = client->getRequest().getUri();
+
+	// 413 antes de qualquer roteamento: se o body já veio maior que o
+	// limite do server{}, nem vale a pena decidir CGI/upload/etc.
+	const std::string& body = client->getRequest().getBody();
+	if (!body.empty() && body.size() > serverConfig.getMaxBodySize())
+	{
+		std::cout << "[DISPATCH] Body too large: " << body.size()
+			<< " > " << serverConfig.getMaxBodySize() << std::endl;
+		client->setResponse(ErrorBuilder::build(413, ""));
+		client->setState(Client::WRITING);
+
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+		return;
+	}
 
 	LocationConfig loc = Router::matchLoc(serverConfig, uri);
 	std::string filePath = resolveFilePath(loc, serverConfig, uri);

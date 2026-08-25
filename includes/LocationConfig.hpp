@@ -16,6 +16,7 @@ class LocationConfig {
 		std::string					_cgi_path;
 		std::string					_returnPath;
 		int							_returnCode;
+		std::string					_uploadDir;
 		std::map<int, std::string>	_error_pages;
 
 	public:
@@ -32,6 +33,7 @@ class LocationConfig {
 		const std::string& getCgiPath() const { return _cgi_path; }
 		const std::string& getReturnPath() const { return _returnPath; }
 		int getReturnCode() const { return _returnCode; }
+		const std::string& getUploadDir() const { return _uploadDir; }
 		const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
 
 		// setters
@@ -44,6 +46,7 @@ class LocationConfig {
 		void setCgiPath(const std::string& v) { _cgi_path = v; }
 		void setReturnPath(const std::string& v) { _returnPath = v; }
 		void setReturnCode(int v) { _returnCode = v; }
+		void setUploadDir(const std::string& v) { _uploadDir = v; }
 		void setErrorPages(const std::map<int, std::string>& v) { _error_pages = v; }
 
 };
