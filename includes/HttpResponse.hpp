@@ -17,7 +17,10 @@ class HttpResponse
 		std::string							body;
 		// aqui ainda vai um serializer que eu nao entendi ainda.
 
+	std::string serialize() const;
+
 	private:
+		static std::string getStatusMessage(int code);
 
 };
 
