@@ -66,11 +66,13 @@ bool Client::readData() {
 		std::cout << "Complete request received on fd: " << _fd << std::endl;
 		return (true);
     }
-    else{
+     else if (bytes == 0)
+    {
 		_state_e = CLOSED;
 		return (true);
     }
-
+    else
+		return (false);
 }
 
 bool Client::writeData() {
