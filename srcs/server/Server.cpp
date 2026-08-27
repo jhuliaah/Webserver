@@ -34,6 +34,12 @@
 #include <sys/wait.h>
 #include "../../includes/CgiHandler.hpp"
 
+namespace {
+	// sig_atomic_t: só isso é seguro de tocar dentro de um signal handler.
+	volatile sig_atomic_t g_shutdown = 0;
+	void handleShutdownSignal(int) { g_shutdown = 1; }
+}
+
 //================================
 //			Constructors		//
 //================================
@@ -45,7 +51,8 @@ Server::~Server() {
 		close(_sockets[i]->getFd());
 		delete _sockets[i];
 	}
-	close(_epollFd);
+	if (_epollFd != -1)
+		close(_epollFd);
 }
 
 bool Server::isServerFd(int fd) {
@@ -61,6 +68,9 @@ bool Server::isServerFd(int fd) {
 //================================
 
 void	Server::initServer() {
+	signal(SIGINT, handleShutdownSignal);
+	signal(SIGTERM, handleShutdownSignal);
+
     _epollFd = epoll_create(10);
 	if (_epollFd == -1)
 		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
@@ -295,10 +305,10 @@ void Server::serverLoop(){
     const int MAX_EVENTS = 64;
     struct epoll_event events[MAX_EVENTS];
 
-    while (true){
+    while (!g_shutdown){
         int numEvents = epoll_wait(_epollFd, events, MAX_EVENTS, 2000);
-        if(numEvents == -1) continue;
-        
+        if(numEvents == -1) continue; // EINTR (ex.: SIGINT) cai aqui e o while checa g_shutdown de novo
+
         for (int i = 0; i < numEvents; i++){
             int currentFd = events[i].data.fd;
 
@@ -340,6 +350,13 @@ void Server::serverLoop(){
         }
         checkTimeouts();
     }
+
+	std::cout << "\n[SERVER] Shutdown signal received, closing connections..." << std::endl;
+	std::vector<int> pendingFds;
+	for (std::map<int, Client*>::iterator it = _clients.begin(); it != _clients.end(); ++it)
+		pendingFds.push_back(it->first);
+	for (size_t i = 0; i < pendingFds.size(); i++)
+		removeClient(pendingFds[i]);
 }
 
 void Server::checkTimeouts() {

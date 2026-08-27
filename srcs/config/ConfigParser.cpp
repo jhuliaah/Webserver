@@ -49,9 +49,32 @@ std::vector<ParsedServer> ConfigParser::parseTokens(const std::vector<string> &t
 
     if (servers.empty())
         throw ParseException("no server block found in the config file");
-    
+
+    // server_name duplicado dentro do MESMO host:port: dois server{}
+    // brigando pelo mesmo endereço com o mesmo nome não faz sentido --
+    // o cliente nunca saberia qual dos dois responder. server_name igual
+    // em host:port DIFERENTES é normal (ex.: dois server{} descrevendo a
+    // mesma máquina em portas diferentes) e não é considerado conflito.
+    for (size_t a = 0; a < servers.size(); ++a)
+    {
+        for (size_t b = a + 1; b < servers.size(); ++b)
+        {
+            if (servers[a].host != servers[b].host || servers[a].port != servers[b].port)
+                continue;
+            for (size_t na = 0; na < servers[a].serverName.size(); ++na)
+            {
+                for (size_t nb = 0; nb < servers[b].serverName.size(); ++nb)
+                {
+                    if (servers[a].serverName[na] == servers[b].serverName[nb])
+                        throw ParseException("duplicate server_name in the same host:port: "
+                            + servers[a].serverName[na]);
+                }
+            }
+        }
+    }
+
     return (servers);
-} 
+}
 
 ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, size_t &i)
 {

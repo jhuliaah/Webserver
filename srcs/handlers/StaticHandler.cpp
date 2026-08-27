@@ -28,6 +28,8 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	std::string root = loc.getRoot();
 
 	if (root.empty()){root = "./www";}
+	if (root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
 	std::string filePath = root + req.getUri();
 
 	struct stat path_stat;
