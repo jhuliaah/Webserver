@@ -64,6 +64,8 @@ void	Server::initServer() {
     _epollFd = epoll_create(10);
 	if (_epollFd == -1)
 		throw ServerException(std::string("epoll_create failed -> ") + strerror(errno));
+	if (fcntl(_epollFd, F_SETFD, FD_CLOEXEC) == -1)
+		throw ServerException(std::string("epoll FD_CLOEXEC failed -> ") + strerror(errno));
 
 	std::vector<ServerConfig> _servers = _config.getServers();
 	for (size_t i = 0; i < _servers.size(); i++){
@@ -104,6 +106,7 @@ void Server::handleNewConnection(int serverFd){
     if (clientFd == -1) return;
 
     fcntl(clientFd, F_SETFL, O_NONBLOCK);
+    fcntl(clientFd, F_SETFD, FD_CLOEXEC);
 
     struct epoll_event event;
     event.events = EPOLLIN;
@@ -139,13 +142,24 @@ void Server::removeClient(int fd) {
 	if (_clients.find(fd) == _clients.end()) return;
 
 	Client* client = _clients[fd];
-	if (client->getCgiContext().pid != -1 || client->getCgiContext().stdout_fd != -1){
-		int pipeFd = client->getCgiContext().stdout_fd;
-		if (pipeFd != -1) {
-			epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
-			close(pipeFd);
-			_cgiPipes.erase(pipeFd);
+	if (client->getCgiContext().pid != -1
+		|| client->getCgiContext().stdout_fd != -1
+		|| client->getCgiContext().stdin_fd != -1){
+
+		int pipeOutFd = client->getCgiContext().stdout_fd;
+		if (pipeOutFd != -1) {
+			epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeOutFd, NULL);
+			close(pipeOutFd);
+			_cgiPipes.erase(pipeOutFd);
 		}
+
+		int pipeInFd = client->getCgiContext().stdin_fd;
+		if (pipeInFd != -1) {
+			epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeInFd, NULL);
+			close(pipeInFd);
+			_cgiWritePipes.erase(pipeInFd);
+		}
+
 		if (client->getCgiContext().pid != -1) {
 			kill(client->getCgiContext().pid, SIGKILL);
 			waitpid(client->getCgiContext().pid, NULL, WNOHANG);

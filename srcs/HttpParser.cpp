@@ -17,6 +17,7 @@ static std::string trim(const std::string& s)
 
 bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpRequest& req)
 {
+    (void)req;
     size_t lineEnd = raw.find("\r\n", pos);
     if (lineEnd == std::string::npos)
         return (false);

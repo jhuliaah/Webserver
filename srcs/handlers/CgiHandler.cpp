@@ -190,15 +190,17 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		close(pipe_out[1]);
 
 		fcntl(pipe_out[0], F_SETFL, O_NONBLOCK);
+		fcntl(pipe_out[0], F_SETFD, FD_CLOEXEC);
 
 		Client::CgiContext& cgi = client.getCgiContext();
 		cgi.pid = pid;
 		cgi.stdout_fd = pipe_out[0];
 		cgi.startTime = time(NULL);
 		cgi.inputSent = 0;
-		
+
 		if (req.getMethod() == "POST") {
 			fcntl(pipe_in[1], F_SETFL, O_NONBLOCK);
+			fcntl(pipe_in[1], F_SETFD, FD_CLOEXEC);
 			cgi.stdin_fd = pipe_in[1];
 		} else {
 			close(pipe_in[1]);
