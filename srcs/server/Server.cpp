@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/14 15:41:27 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/01 16:28:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,7 @@
 #include <ctime>			// time, time_t
 #include <iostream>			// cout, endl
 #include <signal.h>
+#include <sstream>
 #include <sys/wait.h>
 #include "../../includes/CgiHandler.hpp"
 
@@ -193,6 +194,36 @@ static std::string resolveFilePath(const LocationConfig& loc, const ServerConfig
 	return root + uri;
 }
 
+static std::string resolveCustomErrorPagePath(const LocationConfig& loc, const ServerConfig& server,
+	const std::string& pagePath)
+{
+	if (pagePath.empty())
+		return "";
+	if (pagePath[0] == '/' || pagePath.compare(0, 2, "./") == 0)
+		return pagePath;
+
+	std::string root = loc.getRoot().empty() ? server.getRoot() : loc.getRoot();
+	if (root.empty())
+		root = "./www";
+	if (!root.empty() && root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	return root + "/" + pagePath;
+}
+
+static std::string buildRedirectResponse(int statusCode, const std::string& target)
+{
+	std::ostringstream oss;
+	std::string message = (statusCode == 301) ? "Moved Permanently" : "Found";
+	std::string body = "<html><body><h1>" + message + "</h1></body></html>";
+	oss << "HTTP/1.1 " << statusCode << " " << message << "\r\n"
+		<< "Location: " << target << "\r\n"
+		<< "Content-Type: text/html\r\n"
+		<< "Content-Length: " << body.length() << "\r\n"
+		<< "\r\n"
+		<< body;
+	return oss.str();
+}
+
 void Server::dispatchRequest(int currentFd, Client* client)
 {
 	HttpParser parser;
@@ -233,6 +264,17 @@ void Server::dispatchRequest(int currentFd, Client* client)
 	}
 
 	LocationConfig loc = Router::matchLoc(serverConfig, uri);
+	if (loc.getReturnCode() != 0 && !loc.getReturnPath().empty())
+	{
+		client->setResponse(buildRedirectResponse(loc.getReturnCode(), loc.getReturnPath()));
+		client->setState(Client::WRITING);
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+		return;
+	}
+
 	std::string filePath = resolveFilePath(loc, serverConfig, uri);
 	RouteType type = Router::classify(loc, filePath, method);
 
@@ -244,7 +286,7 @@ void Server::dispatchRequest(int currentFd, Client* client)
 		std::string customErrorPage = "";
 		const std::map<int, std::string>& errorPages = loc.getErrorPages();
 		if (errorPages.find(405) != errorPages.end())
-			customErrorPage = errorPages.find(405)->second;
+			customErrorPage = resolveCustomErrorPagePath(loc, serverConfig, errorPages.find(405)->second);
 		client->setResponse(ErrorBuilder::build(405, customErrorPage));
 		client->setState(Client::WRITING);
 		readyToWrite = true;
@@ -285,6 +327,11 @@ void Server::dispatchRequest(int currentFd, Client* client)
 	{
 		UploadHandler upload;
 		readyToWrite = upload.handle(client->getRequest(), loc, *client);
+	}
+	else if (method == "HEAD")
+	{
+		StaticHandler st;
+		readyToWrite = st.handle(client->getRequest(), loc, *client);
 	}
 	else // STATIC ou DIR -> StaticHandler decide (index/autoindex/404/etc)
 	{

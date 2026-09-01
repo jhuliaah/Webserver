@@ -1,13 +1,13 @@
 #include "../../includes/DeleteHandler.hpp"
 #include "../../includes/HttpResponse.hpp"
 #include <unistd.h>
+#include <sys/stat.h>
 #include <iostream>
 
 DeleteHandler::DeleteHandler() {}
 DeleteHandler::~DeleteHandler() {}
 
 bool DeleteHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client){
-	// Use location root if provided, otherwise default to ./www
 	std::string root = loc.getRoot().empty() ? "./www" : loc.getRoot();
 	std::string uri = req.getUri();
 	if (!root.empty() && root[root.size() - 1] == '/')
@@ -16,16 +16,20 @@ bool DeleteHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		uri = "/";
 	std::string filePath = root + (uri[0] == '/' ? uri : std::string("/") + uri);
 
+	struct stat pathStat;
 	HttpResponse res;
 	res.headers["Content-Type"] = "text/html";
 
-	// Verificar se o arquivo existe
-	if (access(filePath.c_str(), F_OK) == -1) {
+	if (stat(filePath.c_str(), &pathStat) == -1) {
 		std::cout << "[DELETE] File not found: " << filePath << std::endl;
 		res.status_code = 404;
 		res.body = "<html><body><center><h1>404 Not Found</h1></center></body></html>";
 	}
-	// Verificar se pode apagar
+	else if (S_ISDIR(pathStat.st_mode)) {
+		std::cout << "[DELETE] Cannot delete directory: " << filePath << std::endl;
+		res.status_code = 403;
+		res.body = "<html><body><center><h1>403 Forbidden</h1></center></body></html>";
+	}
 	else if (access(filePath.c_str(), W_OK) == -1) {
 		std::cout << "[DELETE] No permission to delete: " << filePath << std::endl;
 		res.status_code = 403;
@@ -34,7 +38,7 @@ bool DeleteHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	else if (unlink(filePath.c_str()) == 0) {
 		std::cout << "[DELETE] File deleted successfully: " << filePath << std::endl;
 		res.status_code = 204;
-		res.headers.erase("Content-Type"); // 204 não tem body, não faz sentido ter Content-Type
+		res.headers.erase("Content-Type");
 	}
 	else {
 		std::cout << "[DELETE] Internal error while deleting file." << std::endl;

@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 20:53:24 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/01 15:32:58 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,12 +20,28 @@
 #include <sstream>
 #include <map>
 
+static std::string resolveCustomErrorPagePath(const LocationConfig& loc, const std::string& pagePath)
+{
+	if (pagePath.empty())
+		return "";
+	if (pagePath[0] == '/' || pagePath.compare(0, 2, "./") == 0)
+		return pagePath;
+
+	std::string root = loc.getRoot();
+	if (root.empty())
+		root = "./www";
+	if (!root.empty() && root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	return root + "/" + pagePath;
+}
+
 StaticHandler::StaticHandler() {}
 
 StaticHandler::~StaticHandler() {}
 
 bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client){
 	std::string root = loc.getRoot();
+	bool isHead = (req.getMethod() == "HEAD");
 
 	if (root.empty()){root = "./www";}
 	if (root[root.size() - 1] == '/')
@@ -40,7 +56,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		std::string customErrorPage = "";
 		const std::map<int, std::string>& errorPages = loc.getErrorPages();
 		if (errorPages.find(404) != errorPages.end()) {
-			customErrorPage = errorPages.find(404)->second;
+			customErrorPage = resolveCustomErrorPagePath(loc, errorPages.find(404)->second);
 		}
 		client.setResponse(ErrorBuilder::build(404, customErrorPage));
 		client.setState(Client::WRITING);
@@ -68,12 +84,11 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 				res.headers["Content-Type"] = getMimeType(indexPath);
 				res.headers["Connection"] = "keep-alive";
 
-				// mesmo raciocínio do "ficheiro comum" lá embaixo:
-				// Content-Length explícito porque o body de verdade vai
-				// em chunks via startFileStream/sendNextChunk, não aqui.
 				std::ostringstream lenStream;
 				lenStream << indexStat.st_size;
 				res.headers["Content-Length"] = lenStream.str();
+				if (isHead)
+					res.body.clear();
 
 				client.setResponse(res.serialize());
 				client.setState(Client::WRITING);
@@ -83,7 +98,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 				std::string customErrorPage = "";
 				const std::map<int, std::string>& errorPages = loc.getErrorPages();
 				if (errorPages.find(403) != errorPages.end()) {
-					customErrorPage = errorPages.find(403)->second;
+					customErrorPage = resolveCustomErrorPagePath(loc, errorPages.find(403)->second);
 				}
 				client.setResponse(ErrorBuilder::build(403, customErrorPage));
 				client.setState(Client::WRITING);
@@ -96,7 +111,13 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			HttpResponse res;
 			res.status_code = 200;
 			res.headers["Content-Type"] = "text/html";
-			res.body = buildAutoIndex(filePath, req.getUri());
+			std::string body = buildAutoIndex(filePath, req.getUri());
+			if (isHead)
+				body.clear();
+			res.body = body;
+			std::ostringstream lenStream;
+			lenStream << body.size();
+			res.headers["Content-Length"] = lenStream.str();
 			client.setResponse(res.serialize());
 			client.setState(Client::WRITING);
 			return true;
@@ -106,7 +127,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			std::string customErrorPage = "";
 			const std::map<int, std::string>& errorPages = loc.getErrorPages();
 			if (errorPages.find(403) != errorPages.end()) {
-				customErrorPage = errorPages.find(403)->second;
+				customErrorPage = resolveCustomErrorPagePath(loc, errorPages.find(403)->second);
 			}
 			client.setResponse(ErrorBuilder::build(403, customErrorPage));
 			client.setState(Client::WRITING);
@@ -123,13 +144,11 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			res.headers["Content-Type"] = getMimeType(filePath);
 			res.headers["Connection"] = "keep-alive";
 
-			// Content-Length explícito de propósito: o body de verdade NÃO
-			// vai aqui dentro, ele é mandado depois em pedaços via
-			// startFileStream/sendNextChunk. O serialize() respeita esse
-			// Content-Length e não tenta preencher um body vazio por cima.
 			std::ostringstream lenStream;
 			lenStream << path_stat.st_size;
 			res.headers["Content-Length"] = lenStream.str();
+			if (isHead)
+				res.body.clear();
 
 			client.setResponse(res.serialize());
 			client.setState(Client::WRITING);
@@ -139,7 +158,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			std::string customErrorPage = "";
 			const std::map<int, std::string>& errorPages = loc.getErrorPages();
 			if (errorPages.find(403) != errorPages.end()) {
-				customErrorPage = errorPages.find(403)->second;
+				customErrorPage = resolveCustomErrorPagePath(loc, errorPages.find(403)->second);
 			}
 			client.setResponse(ErrorBuilder::build(403, customErrorPage));
 			client.setState(Client::WRITING);

@@ -58,6 +58,11 @@ RouteType Router::classify(LocationConfig loc, std::string path, std::string met
                 allowed = true;
                 break;
             }
+            if (method == "HEAD" && methods[i] == "GET")
+            {
+                allowed = true;
+                break;
+            }
         }
         if (!allowed)
             return ERROR;
