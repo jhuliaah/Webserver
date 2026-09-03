@@ -61,7 +61,8 @@ bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpR
     std::string target = line.substr(sp1 + 1, sp2 - sp1 - 1);
     std::string version = line.substr(sp2 + 1);
 
-    if (method.empty() || target.empty() || version.find("HTTP/") != 0)
+    if (method.empty() || target.empty()
+        || (version != "HTTP/1.0" && version != "HTTP/1.1"))
         return (false);
 
     req.setVersion(version);
@@ -96,6 +97,8 @@ bool HttpParser::parseHeadersFrom(const std::string& raw, size_t& pos, HttpReque
 		if (lineEnd == pos) // linha vazia -> fim dos headers
 		{
 			pos = lineEnd + 2;
+            if (req.getVersion() == "HTTP/1.1" && req.getHeader("Host").empty())
+                return false;
 			return true;
 		}
 
