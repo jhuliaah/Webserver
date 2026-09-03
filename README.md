@@ -41,7 +41,7 @@ If no configuration file is given, a default configuration path is used.
 ### Example
 
 ```bash
-./webserv config/default.conf
+./webserv config_files/default/config.conf
 ```
 
 Once running, the server can be tested with a browser or with `curl`/`telnet` against the configured host and port(s), e.g.:
@@ -65,18 +65,19 @@ server {
     error_page 404 /errors/404.html;
 
     location / {
-        methods GET POST DELETE;
+        allow_methods GET POST DELETE;
         autoindex on;
     }
 
     location /upload {
-        methods POST;
-        upload_store www/uploads;
+        allow_methods POST;
+        upload_dir www/uploads;
     }
 
     location /cgi-bin {
-        methods GET POST;
-        cgi_extension .py /usr/bin/python3;
+        allow_methods GET POST;
+        cgi_path /usr/bin/python3;
+        cgi_ext .py;
     }
 }
 ```
