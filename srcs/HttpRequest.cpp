@@ -12,6 +12,7 @@ const std::string& HttpRequest::getUri() const { return _uri; }
 const std::string& HttpRequest::getPath() const { return _path; }
 const std::string& HttpRequest::getQueryString() const { return _queryString; }
 const std::string& HttpRequest::getBody() const { return _body; }
+const std::string& HttpRequest::getVersion() const { return _version; }
 const std::map<std::string, std::string>& HttpRequest::getHeaders() const { return _headers; }
 
 std::string HttpRequest::getHeader(const std::string& name) const {
@@ -41,6 +42,7 @@ void HttpRequest::setUri(const std::string& uri) { _uri = uri; }
 void HttpRequest::setPath(const std::string& path) { _path = path; }
 void HttpRequest::setQueryString(const std::string& queryString) { _queryString = queryString; }
 void HttpRequest::setBody(const std::string& body) { _body = body; }
+void HttpRequest::setVersion(const std::string& version) { _version = version; }
 
 void HttpRequest::addHeader(const std::string& key, const std::string& value) {
     _headers[key] = value;

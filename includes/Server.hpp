@@ -16,6 +16,7 @@
 #include <vector>
 #include <map>
 #include <string>
+#include <sys/types.h>
 
 #include "Socket.hpp"
 #include "Config.hpp"
@@ -30,14 +31,21 @@ class Server{
 		std::map<int, Client*>		_clients;
 		std::map<int, Client*>		_cgiPipes;
 		std::map<int, Client*>		_cgiWritePipes;
+		// pids de CGI já mortos/finalizados (SIGKILL ou stdout fechado) mas
+		// que um waitpid(..., WNOHANG) ainda não conseguiu colher na hora --
+		// reapPendingChildren() tenta de novo a cada volta do serverLoop, em
+		// vez de bloquear o loop inteiro esperando o processo terminar.
+		std::vector<pid_t>			_pendingReap;
 		Config						_config;
-		
+
 
 		void	handleNewConnection(int server_fd);
 		bool	isServerFd(int fd);
 		void	checkTimeouts();
 		void	handleCgiOutput(int pipeFd);
 		void	handleCgiWrite(int pipeFd);
+		void	reapChild(pid_t pid);
+		void	reapPendingChildren();
 
 		void removeClient(int fd);
 

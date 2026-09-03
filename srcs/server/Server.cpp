@@ -26,6 +26,7 @@
 #include <sys/socket.h>		// bind, listen, accept, socklen_t
 #include <unistd.h>			// close
 
+#include <cctype>			// tolower
 #include <cerrno>			// errno
 #include <cstring>			// strerror, memset
 #include <ctime>			// time, time_t
@@ -96,8 +97,18 @@ void	Server::initServer() {
 	
 		//bind() -> este socket vai receber conexoes na porta 8080
 		if (bind(fd, (struct sockaddr*)&address, sizeof(address)) == -1){
+			// newSocket ainda não foi pra _sockets (só entra na linha de baixo,
+			// depois do bind/listen passarem), então o destructor do Server não
+			// ia limpar esse fd/objeto no unwind da exceção -- fechar e deletar
+			// aqui à mão antes de lançar. Sem isso, ASan/LeakSanitizer acusa
+			// "Direct leak" nesse Socket toda vez que um bind() falha (ex.: duas
+			// server{} na mesma interface:porta, ou porta já em uso).
+			close(fd);
+			delete newSocket;
 			throw ServerException(std::string("bind() system call failed -> ") + strerror(errno)); }
 		if (listen(fd, 10) == -1){
+			close(fd);
+			delete newSocket;
 			throw ServerException(std::string("listen() system call failed -> ") + strerror(errno));}
 	
 		_sockets.push_back(newSocket);
@@ -133,6 +144,11 @@ void Server::handleNewConnection(int serverFd){
     
     _clients[clientFd] = new Client(clientFd);
     _clients[clientFd]->setServerFd(serverFd);
+    // seta o client_max_body_size do server{} já aqui, no accept -- é o
+    // primeiro momento em que dá pra saber (o socket de listen decide qual
+    // server{} é esse) e deixa Client::readData() cortar o body cedo, em vez
+    // de só descobrir o limite depois que tudo já foi lido.
+    _clients[clientFd]->setMaxBodySize(findServerConfig(serverFd).getMaxBodySize());
     std::cout << "New client connected on fd: " << clientFd << std::endl;
 }
 
@@ -151,6 +167,31 @@ const ServerConfig& Server::findServerConfig(int serverFd) const
 			return servers[i];
 	}
 	return servers[0]; // fallback: não devia acontecer, mas evita crash
+}
+
+// waitpid(pid, NULL, 0) bloqueia até o processo terminar de verdade -- num
+// server single-threaded rodando dentro de um handler de epoll, isso trava
+// TODO o loop (todo cliente, toda conexão) até aquele filho específico ser
+// colhido pelo kernel. Mesmo depois de SIGKILL isso não é instantâneo
+// garantido (processo em D state, por exemplo). WNOHANG nunca bloqueia: se o
+// processo já morreu, colhe na hora; se não, guarda o pid pra tentar de novo
+// no próximo reapPendingChildren() em vez de travar esperando.
+void Server::reapChild(pid_t pid) {
+	if (waitpid(pid, NULL, WNOHANG) == 0)
+		_pendingReap.push_back(pid);
+}
+
+void Server::reapPendingChildren() {
+	std::vector<pid_t> stillPending;
+
+	for (size_t i = 0; i < _pendingReap.size(); i++) {
+		pid_t pid = _pendingReap[i];
+		pid_t result = waitpid(pid, NULL, WNOHANG);
+		if (result == 0)
+			stillPending.push_back(pid); // ainda rodando, tenta na próxima volta
+		// result == pid (colhido) ou -1 (ex.: ECHILD, já não existe mais) -> descarta
+	}
+	_pendingReap = stillPending;
 }
 
 void Server::removeClient(int fd) {
@@ -177,7 +218,7 @@ void Server::removeClient(int fd) {
 
 		if (client->getCgiContext().pid != -1) {
 			kill(client->getCgiContext().pid, SIGKILL);
-			waitpid(client->getCgiContext().pid, NULL, 0);
+			reapChild(client->getCgiContext().pid);
 			client->getCgiContext().pid = -1;
 		}
 	}
@@ -231,13 +272,24 @@ static std::string buildRedirectResponse(int statusCode, const std::string& targ
 
 void Server::dispatchRequest(int currentFd, Client* client)
 {
-	HttpParser parser;
-	HttpParser::State parseState = parser.parse(client->getRawRequest(), client->getRequest());
+	// achado antes do parse-error também, porque agora o 400 já precisa
+	// dele pra tentar resolver uma error_page 400 custom (só existe
+	// server{} nesse ponto, a request ainda nem foi roteada pra location
+	// nenhuma).
+	const ServerConfig& serverConfig = findServerConfig(client->getServerFd());
 
-	if (parseState == HttpParser::ERROR)
+	// Client::readData() já cortou a leitura assim que percebeu que o body
+	// ia estourar client_max_body_size -- _rawRequest pode estar com o body
+	// incompleto de propósito, então nem vale tentar dar parse nele: já sabe
+	// que a resposta é 413.
+	if (client->isBodyTooLarge())
 	{
-		// request line ou headers malformados -> 400, nem tenta rotear
-		client->setResponse(ErrorBuilder::build(400, ""));
+		std::cout << "[DISPATCH] Body too large, cut off during read (before buffering it all)" << std::endl;
+		std::string customErrorPage413 = "";
+		const std::map<int, std::string>& serverErrorPages413 = serverConfig.getErrorPages();
+		if (serverErrorPages413.find(413) != serverErrorPages413.end())
+			customErrorPage413 = ErrorBuilder::resolvePagePath(serverConfig.getRoot(), serverErrorPages413.find(413)->second);
+		client->setResponse(ErrorBuilder::build(413, customErrorPage413));
 		client->setState(Client::WRITING);
 
 		struct epoll_event event;
@@ -247,9 +299,49 @@ void Server::dispatchRequest(int currentFd, Client* client)
 		return;
 	}
 
-	const ServerConfig& serverConfig = findServerConfig(client->getServerFd());
+	HttpParser parser;
+	HttpParser::State parseState = parser.parse(client->getRawRequest(), client->getRequest());
+
+	if (parseState == HttpParser::ERROR)
+	{
+		// request line ou headers malformados -> 400, nem tenta rotear
+		std::string customErrorPage400 = "";
+		const std::map<int, std::string>& serverErrorPages = serverConfig.getErrorPages();
+		if (serverErrorPages.find(400) != serverErrorPages.end())
+			customErrorPage400 = ErrorBuilder::resolvePagePath(serverConfig.getRoot(), serverErrorPages.find(400)->second);
+		client->setResponse(ErrorBuilder::build(400, customErrorPage400));
+		client->setState(Client::WRITING);
+
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = currentFd;
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+		return;
+	}
+
 	const std::string& method = client->getRequest().getMethod();
 	const std::string& uri = client->getRequest().getUri();
+
+	// HTTP/1.1 é keep-alive por padrão a menos que o client peça "close";
+	// HTTP/1.0 (ou qualquer coisa fora 1.1) é o oposto -- fecha por padrão a
+	// menos que o client peça "keep-alive" explícito. Setado aqui, antes de
+	// qualquer handler montar resposta: StaticHandler manda "Connection:
+	// keep-alive" incondicionalmente sem olhar a request, então sem isso um
+	// GET HTTP/1.0 comum (curl/ab/siege sem -k/-b) ficava preso numa conexão
+	// que ele nunca pediu pra manter aberta -- Client::setResponse usa esse
+	// valor como decisão final quando a resposta não diz "close" ela mesma.
+	std::string connectionHeader = client->getRequest().getHeader("Connection");
+	for (size_t i = 0; i < connectionHeader.size(); ++i)
+		connectionHeader[i] = static_cast<char>(std::tolower(connectionHeader[i]));
+	bool clientWantsClose = connectionHeader.find("close") != std::string::npos;
+	bool clientWantsKeepAlive = connectionHeader.find("keep-alive") != std::string::npos;
+	bool isHttp11 = (client->getRequest().getVersion() == "HTTP/1.1");
+	client->setKeepAliveEligible(!clientWantsClose && (isHttp11 || clientWantsKeepAlive));
+
+	// matchLoc subiu pra antes do check de 413 (era só declarado lá embaixo)
+	// pra dar pro 413 acesso à error_page da location, igual 403/404/405/500
+	// já fazem -- não tem custo, matchLoc não tem efeito colateral nenhum.
+	LocationConfig loc = Router::matchLoc(serverConfig, uri);
 
 	// 413 antes de qualquer roteamento: se o body já veio maior que o
 	// limite do server{}, nem vale a pena decidir CGI/upload/etc.
@@ -258,7 +350,11 @@ void Server::dispatchRequest(int currentFd, Client* client)
 	{
 		std::cout << "[DISPATCH] Body too large: " << body.size()
 			<< " > " << serverConfig.getMaxBodySize() << std::endl;
-		client->setResponse(ErrorBuilder::build(413, ""));
+		std::string customErrorPage413 = "";
+		const std::map<int, std::string>& errorPages413 = loc.getErrorPages();
+		if (errorPages413.find(413) != errorPages413.end())
+			customErrorPage413 = resolveCustomErrorPagePath(loc, serverConfig, errorPages413.find(413)->second);
+		client->setResponse(ErrorBuilder::build(413, customErrorPage413));
 		client->setState(Client::WRITING);
 
 		struct epoll_event event;
@@ -268,7 +364,6 @@ void Server::dispatchRequest(int currentFd, Client* client)
 		return;
 	}
 
-	LocationConfig loc = Router::matchLoc(serverConfig, uri);
 	if (loc.getReturnCode() != 0 && !loc.getReturnPath().empty())
 	{
 		client->setResponse(buildRedirectResponse(loc.getReturnCode(), loc.getReturnPath()));
@@ -395,7 +490,7 @@ void Server::serverLoop(){
 					// Manda o Cliente enviar os próprios dados
 					Client* client = _clients[currentFd];
 					if (client->writeData() == true) {
-						if (client->getState() == Client::CLOSED) {
+						if (client->getState() == Client::CLOSED || client->shouldClose()) {
 							removeClient(currentFd);
 						} else {
 							client->prepareNextRequest();
@@ -409,6 +504,7 @@ void Server::serverLoop(){
             }
         }
         checkTimeouts();
+        reapPendingChildren();
     }
 
 	std::cout << "\n[SERVER] Shutdown signal received, closing connections..." << std::endl;
@@ -432,6 +528,11 @@ void Server::checkTimeouts() {
 				std::cout << "[TIMEOUT 504] CGI script on fd " << clientFd << " timed out. Killing process!" << std::endl;
 				if (client->getCgiContext().pid != -1){
 					kill(client->getCgiContext().pid, SIGKILL);
+					// sem isso o pid virava zumbio até o cliente eventualmente
+					// desconectar e passar por removeClient() -- que também
+					// reapa, mas não devia ser o único lugar que faz isso.
+					reapChild(client->getCgiContext().pid);
+					client->getCgiContext().pid = -1;
 				}
 
 				int pipeFd = client->getCgiContext().stdout_fd;
@@ -493,10 +594,10 @@ void Server::handleCgiWrite(int pipeFd) {
 			client->getCgiContext().stdin_fd = -1;
 			if (client->getCgiContext().pid != -1) {
 				kill(client->getCgiContext().pid, SIGKILL);
-				waitpid(client->getCgiContext().pid, NULL, 0);
+				reapChild(client->getCgiContext().pid);
 				client->getCgiContext().pid = -1;
 			}
-			client->setResponse(ErrorBuilder::build(500, ""));
+			client->setResponse(ErrorBuilder::build(500, client->getCgiContext().errorPage500));
 			client->setState(Client::WRITING);
 			struct epoll_event event;
 			event.events = EPOLLOUT;
@@ -505,7 +606,7 @@ void Server::handleCgiWrite(int pipeFd) {
 			return;
 		}
 	}
-	
+
 	if (client->getCgiContext().inputSent >= body.length()){
 		std::cout << "[CGI] Request body sent. Sending EOF to stdin pipe." << std::endl;
 
@@ -535,7 +636,7 @@ void Server::handleCgiOutput(int pipeFd) {
 
 		CgiHandler::parseCgiOutput(client->getCgiContext().cgiOutput, *client);
 		if (client->getCgiContext().pid != -1) {
-			waitpid(client->getCgiContext().pid, NULL, 0);
+			reapChild(client->getCgiContext().pid);
 			client->getCgiContext().pid = -1;
 		}
 		
@@ -551,10 +652,10 @@ void Server::handleCgiOutput(int pipeFd) {
 		client->getCgiContext().stdout_fd = -1;
 		if (client->getCgiContext().pid != -1) {
 			kill(client->getCgiContext().pid, SIGKILL);
-			waitpid(client->getCgiContext().pid, NULL, 0);
+			reapChild(client->getCgiContext().pid);
 			client->getCgiContext().pid = -1;
 		}
-		client->setResponse(ErrorBuilder::build(500, ""));
+		client->setResponse(ErrorBuilder::build(500, client->getCgiContext().errorPage500));
 		client->setState(Client::WRITING);
 		struct epoll_event event;
 		event.events = EPOLLOUT;

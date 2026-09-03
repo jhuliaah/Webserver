@@ -17,6 +17,7 @@ class ConfigParser{
 		static ParsedServer parseServerBlock(const std::vector<string> &tokens, size_t &i);
 		static ParsedLocation parseLocationBlock(const std::vector<string> &tokens, size_t &i);
 		static void expect(const std::vector<string> &tokens, size_t i, const string &value);
+		static const string &valueAt(const std::vector<string> &tokens, size_t i);
 		static size_t parseSize(const string &value);
 		static bool isValidPort(const string &value);
 		static bool isValidIPv4(const string &value);

@@ -13,6 +13,17 @@ void ConfigParser::expect(const std::vector<string> &tokens, size_t i, const str
         throw ParseException(value + "expected in config");
 }
 
+// tokens[i] mas com bounds check: uma diretiva sem valor antes do fim do
+// arquivo (ex.: config truncado logo depois de "root") lia fora dos limites
+// do vector -- undefined behavior, e nessa máquina abortava o processo
+// inteiro em vez de rejeitar o config com um erro limpo.
+const string &ConfigParser::valueAt(const std::vector<string> &tokens, size_t i)
+{
+    if (i >= tokens.size())
+        throw ParseException("unexpected end of config file, value expected");
+    return tokens[i];
+}
+
 //puts in a vector every word of the config file
 std::vector<ParsedServer> ConfigParser::parse(const string &path)
 {
@@ -90,7 +101,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
             if (rootSeen)
                 throw ParseException("duplicate root directive in server block");
             i++;
-            server.root = tokens[i];
+            server.root = valueAt(tokens, i);
             rootSeen = true;
             i++;
             expect(tokens, i, ";");
@@ -99,7 +110,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         else if (key == "index")
         {
             i++;
-            server.index = tokens[i];
+            server.index = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -107,7 +118,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         else if (key == "listen")
         {
             i++;
-            string value = tokens[i];
+            string value = valueAt(tokens, i);
             size_t separator = value.find(':');
             if (separator != std::string::npos)
             {
@@ -164,8 +175,8 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         else if (key == "client_max_body_size")
         {
             i++;
-            //casting the string to size_t 
-            server.clientMaxBodySize = parseSize(tokens[i]);
+            //casting the string to size_t
+            server.clientMaxBodySize = parseSize(valueAt(tokens, i));
             i++;
             expect(tokens, i, ";");
             i++;
@@ -173,7 +184,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         else if (key == "location")
         {
             i++;
-            string path = tokens[i];
+            string path = valueAt(tokens, i);
             i++;
             expect(tokens, i, "{");
             i++;
@@ -216,7 +227,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "root")
         {
             i++;
-            loc.root = tokens[i];
+            loc.root = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -224,7 +235,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "index")
         {
             i++;
-            loc.index = tokens[i];
+            loc.index = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -232,7 +243,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "autoindex")
         {
             i++;
-            loc.autoindex = (tokens[i] == "on");
+            loc.autoindex = (valueAt(tokens, i) == "on");
             i++;
             expect(tokens, i, ";");
             i++;
@@ -240,9 +251,9 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "return")
         {
             i++;
-            loc.redirectCode = std::atoi(tokens[i].c_str());
+            loc.redirectCode = std::atoi(valueAt(tokens, i).c_str());
             i++;
-            loc.redirect = tokens[i];
+            loc.redirect = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -250,7 +261,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "upload_dir")
         {
             i++;
-            loc.uploadDir = tokens[i];
+            loc.uploadDir = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -258,7 +269,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "cgi_path")
         {
             i++;
-            loc.cgiPath = tokens[i];
+            loc.cgiPath = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;
@@ -266,7 +277,7 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
         else if (key == "cgi_ext")
         {
             i++;
-            loc.cgiExt = tokens[i];
+            loc.cgiExt = valueAt(tokens, i);
             i++;
             expect(tokens, i, ";");
             i++;

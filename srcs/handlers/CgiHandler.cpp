@@ -22,6 +22,15 @@
 #include <unistd.h>
 
 
+static std::string resolve500Page(const LocationConfig& loc)
+{
+	const std::map<int, std::string>& errorPages = loc.getErrorPages();
+	std::map<int, std::string>::const_iterator it = errorPages.find(500);
+	if (it == errorPages.end())
+		return "";
+	return ErrorBuilder::resolvePagePath(loc.getRoot(), it->second);
+}
+
 CgiHandler::CgiHandler() {}
 
 CgiHandler::~CgiHandler() {}
@@ -78,7 +87,7 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 {
 	if (buffer.empty())
 	{
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, client.getCgiContext().errorPage500));
 		client.setState(Client::WRITING);
 		return;
 	}
@@ -150,15 +159,26 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 	(void)req;
 	// use location config values (if present) to determine CGI interpreter and script
 	std::string interpreter = loc.getCgiPath().empty() ? "/usr/bin/python3" : loc.getCgiPath();
-	std::string scriptName = req.getUri();
-	if (!scriptName.empty() && scriptName[0] == '/')
-		scriptName = std::string(".") + scriptName; // make relative path like ./cgi-bin/script.py
+	// Antes isto ignorava loc.getRoot() e sempre montava "." + uri -- só
+	// funcionava porque cgi-bin/ mora na raiz do projeto e a location
+	// /cgi-bin não tinha "root" próprio (herdava "./www/" do server, que
+	// nunca era usado de verdade). Agora resolve igual Static/Delete/Upload:
+	// root da location (ou "./www" default) + uri -- então um "root ./;" no
+	// config decide de verdade onde o script mora, em vez de só coincidência
+	// de nome de pasta.
+	std::string root = loc.getRoot();
+	if (root.empty())
+		root = "./www";
+	if (root[root.size() - 1] == '/')
+		root.erase(root.size() - 1);
+	std::string scriptName = root + req.getUri();
+	std::string errorPage500 = resolve500Page(loc);
 	int pipe_in[2]; // Servidor escreve [1] -> python le [0]
 	int pipe_out[2]; // python escreve [1] -> servidor le [0]
 
 	if (pipe(pipe_in) == -1) {
 		std::cerr << "Error creating CGI input pipe" << std::endl;
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, errorPage500));
 		client.setState(Client::WRITING);
 		return true;
 	}
@@ -166,7 +186,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		close(pipe_in[0]);
 		close(pipe_in[1]);
 		std::cerr << "Error creating CGI output pipe" << std::endl;
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, errorPage500));
 		client.setState(Client::WRITING);
 		return true;
 	}
@@ -178,7 +198,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		close(pipe_out[0]);
 		close(pipe_out[1]);
 		std::cerr << "Error forking CGI process" << std::endl;
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, errorPage500));
 		client.setState(Client::WRITING);
 		return true;
 	}
@@ -218,6 +238,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		cgi.stdout_fd = pipe_out[0];
 		cgi.startTime = time(NULL);
 		cgi.inputSent = 0;
+		cgi.errorPage500 = errorPage500;
 
 		if (req.getMethod() == "POST") {
 			fcntl(pipe_in[1], F_SETFL, O_NONBLOCK);

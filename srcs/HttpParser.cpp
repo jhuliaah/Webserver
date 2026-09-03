@@ -15,6 +15,33 @@ static std::string trim(const std::string& s)
     return s.substr(start, end - start + 1);
 }
 
+/*
+	StaticHandler/DeleteHandler/UploadHandler todos só colam loc.root + uri
+	(ex.: "./www" + uri) sem nenhuma checagem de traversal própria, então uma
+	uri com segmento ".." (ex.: GET /../../../../etc/passwd) escapa do root
+	configurado inteiro e lê/escreve/apaga arquivo de fora do www/. Rejeitar
+	isso uma vez aqui, no parse, fecha o buraco pra todo handler de uma vez
+	em vez de remendar cada um separado.
+*/
+static bool hasDotDotSegment(const std::string& path)
+{
+    size_t pos = 0;
+
+    while (pos <= path.size())
+    {
+        size_t next = path.find('/', pos);
+        std::string segment = (next == std::string::npos)
+            ? path.substr(pos)
+            : path.substr(pos, next - pos);
+        if (segment == "..")
+            return true;
+        if (next == std::string::npos)
+            break;
+        pos = next + 1;
+    }
+    return false;
+}
+
 bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpRequest& req)
 {
     (void)req;
@@ -37,7 +64,12 @@ bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpR
     if (method.empty() || target.empty() || version.find("HTTP/") != 0)
         return (false);
 
+    req.setVersion(version);
+
     size_t qPos = target.find('?');
+    std::string uriOnly = (qPos != std::string::npos) ? target.substr(0, qPos) : target;
+    if (hasDotDotSegment(uriOnly))
+        return (false); // ".." no path -> tratado como 400, nunca chega nos handlers
     if (qPos != std::string::npos)
     {
         req.setUri(target.substr(0, qPos));

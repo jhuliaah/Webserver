@@ -48,13 +48,21 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		filePath = root + uri; // uri já começa com "/"
 	}
 
+	// error_page 500 ...; resolvido uma vez -- usado nos dois pontos de
+	// falha abaixo em vez de sempre cair na página genérica do ErrorBuilder.
+	std::string errorPage500 = "";
+	const std::map<int, std::string>& errorPages500 = loc.getErrorPages();
+	std::map<int, std::string>::const_iterator it500 = errorPages500.find(500);
+	if (it500 != errorPages500.end())
+		errorPage500 = ErrorBuilder::resolvePagePath(loc.getRoot(), it500->second);
+
 	// confere se o diretório pai existe de verdade antes de tentar escrever
 	size_t dirEnd = filePath.find_last_of('/');
 	std::string parentDir = (dirEnd == std::string::npos) ? "." : filePath.substr(0, dirEnd);
 	struct stat dirStat;
 	if (stat(parentDir.c_str(), &dirStat) != 0 || !S_ISDIR(dirStat.st_mode)) {
 		std::cout << "[UPLOAD] Diretório de destino não existe: " << parentDir << std::endl;
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, errorPage500));
 		client.setState(Client::WRITING);
 		return true;
 	}
@@ -62,7 +70,7 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	std::ofstream outFile(filePath.c_str(), std::ios::binary | std::ios::trunc);
 	if (!outFile.is_open()) {
 		std::cout << "[UPLOAD] Não foi possível abrir para escrita: " << filePath << std::endl;
-		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setResponse(ErrorBuilder::build(500, errorPage500));
 		client.setState(Client::WRITING);
 		return true;
 	}

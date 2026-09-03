@@ -42,6 +42,19 @@ std::string ErrorBuilder::getDefaultPage(int code, const std::string& message){
 	return html.str();
 }
 
+std::string ErrorBuilder::resolvePagePath(const std::string& root, const std::string& pagePath)
+{
+	if (pagePath.empty())
+		return "";
+	if (pagePath[0] == '/' || pagePath.compare(0, 2, "./") == 0)
+		return pagePath;
+
+	std::string r = root.empty() ? "./www" : root;
+	if (!r.empty() && r[r.size() - 1] == '/')
+		r.erase(r.size() - 1);
+	return r + "/" + pagePath;
+}
+
 std::string ErrorBuilder::build(int errorCode, const std::string& customPagePath){
 	std::string message = getStatusMessage(errorCode);
 	std::string body;

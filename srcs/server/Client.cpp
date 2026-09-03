@@ -80,7 +80,8 @@ static std::string headerValue(const std::string& raw, size_t headerEnd,
 o timeout do CGI a partir de CgiContext.startTime, uma struct nova de Client.*/
 
 Client::Client(int fd) : _fd(fd), _serverFd(-1), _state_e(READING), _contentLength(-1),
-	_fileSize(0), _fileBytesSent(0), _isStreamingFile(false) {
+	_fileSize(0), _fileBytesSent(0), _isStreamingFile(false), _shouldClose(false),
+	_maxBodySize(static_cast<size_t>(-1)), _bodyTooLarge(false), _keepAliveEligible(true) {
     _lastActivity = time(NULL);
 }
 
@@ -94,6 +95,40 @@ void Client::prepareNextRequest() {
 	_lastActivity = time(NULL);
 	_cgiContext.cgiOutput.clear();
 	_cgiContext.inputSent = 0;
+	_shouldClose = false;
+	_bodyTooLarge = false;
+	_keepAliveEligible = true; // recalculado de verdade no próximo dispatchRequest
+}
+
+void Client::setResponse(const std::string& res) {
+	_response = res;
+
+	// Toda resposta que passa por aqui já tenta decidir seu próprio header
+	// "Connection" (ErrorBuilder sempre manda "close", StaticHandler manda
+	// "keep-alive" sem olhar a request, redirects/CGI/upload/delete não
+	// mandam nada). Duas coisas precisam bater aqui:
+	// 1) "Connection: close" na resposta é sempre respeitado (fix anterior:
+	//    antes disso o server nunca fechava de verdade, só o header mentia).
+	// 2) Quando a resposta NÃO pede close (diz "keep-alive" ou não diz
+	//    nada), quem decide de verdade é o que o CLIENT pediu/suporta
+	//    (_keepAliveEligible, setado por Server::dispatchRequest a partir da
+	//    versão HTTP + header Connection da REQUEST) -- senão um GET
+	//    HTTP/1.0 sem "Connection: keep-alive" ficava preso numa conexão
+	//    que ele nunca pediu pra manter aberta (StaticHandler grita
+	//    "keep-alive" incondicionalmente).
+	size_t headerEnd = _response.find("\r\n\r\n");
+	std::string headerBlock = (headerEnd == std::string::npos) ? _response : _response.substr(0, headerEnd);
+	size_t pos = headerBlock.find("Connection:");
+	bool responseSaysClose = false;
+	if (pos != std::string::npos)
+	{
+		size_t lineEnd = headerBlock.find("\r\n", pos);
+		std::string value = (lineEnd == std::string::npos)
+			? headerBlock.substr(pos)
+			: headerBlock.substr(pos, lineEnd - pos);
+		responseSaysClose = (value.find("close") != std::string::npos);
+	}
+	_shouldClose = responseSaysClose || !_keepAliveEligible;
 }
 
 bool Client::isTimeout(time_t currentTime, int timeoutLimit) {
@@ -128,9 +163,32 @@ bool Client::readData() {
 				_contentLength = std::atol(length.c_str());
 			else
 		_contentLength = 0;
+
+			// client_max_body_size: rejeita pelo Content-Length declarado
+			// assim que ele é conhecido, em vez de esperar o body inteiro
+			// chegar pra só então comparar (era o que dispatchRequest fazia
+			// sozinho antes -- um client_max_body_size pequeno não impedia
+			// um Content-Length gigante de ser bufferizado inteiro primeiro).
+			if (_contentLength > 0 && _maxBodySize != static_cast<size_t>(-1)
+				&& static_cast<size_t>(_contentLength) > _maxBodySize)
+			{
+				_bodyTooLarge = true;
+				return (true);
+			}
 		}
 
 		size_t bodyReceived = _rawRequest.size() - (headerEnd + 4);
+
+		// mesmo sem Content-Length confiável (chunked ainda não decodificado,
+		// ou um Content-Length mentiroso menor que o body de verdade), não
+		// deixa o buffer bruto crescer sem limite -- corta assim que os
+		// bytes já recebidos passarem do teto, sem esperar o resto chegar.
+		if (_maxBodySize != static_cast<size_t>(-1) && bodyReceived > _maxBodySize)
+		{
+			_bodyTooLarge = true;
+			return (true);
+		}
+
 		if (_contentLength == -2)
 		{
 			std::string decodedBody;

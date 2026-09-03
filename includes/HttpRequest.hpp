@@ -12,6 +12,7 @@ class HttpRequest
 		std::string _path;
 		std::string _queryString;
 		std::string _body;
+		std::string _version;
 		std::map<std::string, std::string> _headers;
 
 	public:
@@ -24,8 +25,9 @@ class HttpRequest
 		const std::string& getPath() const;
 		const std::string& getQueryString() const;
 		const std::string& getBody() const;
+		const std::string& getVersion() const;
 
-		std::string getHeader(const std::string& name) const; 
+		std::string getHeader(const std::string& name) const;
 		const std::map<std::string, std::string>& getHeaders() const;
 
 		void setMethod(const std::string& method);
@@ -33,6 +35,7 @@ class HttpRequest
 		void setPath(const std::string& path);
 		void setQueryString(const std::string& queryString);
 		void setBody(const std::string& body);
+		void setVersion(const std::string& version);
 		void addHeader(const std::string& key, const std::string& value);
 };
 
