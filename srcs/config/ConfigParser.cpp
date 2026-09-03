@@ -6,17 +6,12 @@
 #include <sstream>
 #include <cctype>
 
-//Perror
 void ConfigParser::expect(const std::vector<string> &tokens, size_t i, const string &value)
 {
     if (i >= tokens.size() || tokens[i] !=value)
         throw ParseException(value + "expected in config");
 }
 
-// tokens[i] mas com bounds check: uma diretiva sem valor antes do fim do
-// arquivo (ex.: config truncado logo depois de "root") lia fora dos limites
-// do vector -- undefined behavior, e nessa máquina abortava o processo
-// inteiro em vez de rejeitar o config com um erro limpo.
 const string &ConfigParser::valueAt(const std::vector<string> &tokens, size_t i)
 {
     if (i >= tokens.size())
@@ -24,7 +19,6 @@ const string &ConfigParser::valueAt(const std::vector<string> &tokens, size_t i)
     return tokens[i];
 }
 
-//puts in a vector every word of the config file
 std::vector<ParsedServer> ConfigParser::parse(const string &path)
 {
     std::ifstream file(path.c_str());
@@ -61,11 +55,6 @@ std::vector<ParsedServer> ConfigParser::parseTokens(const std::vector<string> &t
     if (servers.empty())
         throw ParseException("no server block found in the config file");
 
-    // server_name duplicado dentro do MESMO host:port: dois server{}
-    // brigando pelo mesmo endereço com o mesmo nome não faz sentido --
-    // o cliente nunca saberia qual dos dois responder. server_name igual
-    // em host:port DIFERENTES é normal (ex.: dois server{} descrevendo a
-    // mesma máquina em portas diferentes) e não é considerado conflito.
     for (size_t a = 0; a < servers.size(); ++a)
     {
         for (size_t b = a + 1; b < servers.size(); ++b)
@@ -164,7 +153,6 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
             expect(tokens, i, ";");
             i++;
 
-            //verifying the code and a path error
             if (codes.size() >= 2)
             {
                 const string &pagePath = codes.back();
@@ -175,7 +163,7 @@ ParsedServer ConfigParser::parseServerBlock(const std::vector<string> &tokens, s
         else if (key == "client_max_body_size")
         {
             i++;
-            //casting the string to size_t
+
             server.clientMaxBodySize = parseSize(valueAt(tokens, i));
             i++;
             expect(tokens, i, ";");
@@ -288,8 +276,6 @@ ParsedLocation ConfigParser::parseLocationBlock(const std::vector<string> &token
     return (loc);
 }
 
-
-// converts "2k" / "5M" / "1024" in bytes
 size_t ConfigParser::parseSize(const string &value)
 {
     if (value.empty())

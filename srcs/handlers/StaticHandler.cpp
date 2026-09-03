@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   StaticHandler.cpp                                  :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/09/03 14:03:31 by ratanaka         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "../../includes/StaticHandler.hpp"
 #include "../../includes/ErrorBuilder.hpp"
@@ -50,7 +39,6 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 
 	struct stat path_stat;
 
-	// O Ficheiro/Pasta existe?
 	if (stat(filePath.c_str(), &path_stat) != 0){
 		std::cout << "[STATIC] Error 404: not found -> " << filePath << std::endl;
 		std::string customErrorPage = "";
@@ -62,7 +50,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		client.setState(Client::WRITING);
 		return true;
 	}
-	// pasta comum
+
 	else if (S_ISDIR(path_stat.st_mode)){
 		std::string indexFile = loc.getIndex();
 		std::string indexPath = filePath;
@@ -134,7 +122,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 			return true;
 		}
 	}
-	// ficheiro comum
+
 	else {
 		std::cout << "[STATIC] Starting chunked stream for -> " << filePath << " (" << path_stat.st_size << " bytes)" << std::endl;
 
@@ -196,7 +184,7 @@ std::string StaticHandler::buildAutoIndex(const std::string& path, const std::st
 std::string StaticHandler::getMimeType(const std::string& path){
 	size_t dotPos = path.find_last_of(".");
 	if (dotPos == std::string::npos) {return "text/plain";}
-	
+
 	std::string ext = path.substr(dotPos);
 	if (ext == ".html" || ext == ".htm") return "text/html; charset=UTF-8";
 	if (ext == ".css")  return "text/css";

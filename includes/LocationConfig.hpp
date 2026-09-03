@@ -23,7 +23,6 @@ class LocationConfig {
 		LocationConfig();
 		~LocationConfig();
 
-		// getters
 		const std::string& getPath() const { return _path; }
 		const std::vector<std::string>& getMethods() const { return _methods; }
 		const std::string& getRoot() const { return _root; }
@@ -36,7 +35,6 @@ class LocationConfig {
 		const std::string& getUploadDir() const { return _uploadDir; }
 		const std::map<int, std::string>& getErrorPages() const { return _error_pages; }
 
-		// setters
 		void setPath(const std::string& v) { _path = v; }
 		void setMethods(const std::vector<std::string>& v) { _methods = v; }
 		void setRoot(const std::string& v) { _root = v; }

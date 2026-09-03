@@ -49,4 +49,3 @@ std::string HttpResponse::serialize() const
 	out << "\r\n" << body;
 	return out.str();
 }
-

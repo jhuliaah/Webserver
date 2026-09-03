@@ -9,7 +9,6 @@
 
 typedef std::string string;
 
-
 class ConfigParser{
 
     private:
@@ -22,7 +21,6 @@ class ConfigParser{
 		static bool isValidPort(const string &value);
 		static bool isValidIPv4(const string &value);
 
-
     public:
 	    ConfigParser();
     	~ConfigParser();
@@ -33,16 +31,15 @@ class ConfigParser{
 		{
 			private:
 			string _msg;
-			
+
 			public:
 			ParseException(const string &msg) : _msg(msg){}
 			virtual ~ParseException() throw() {}
 			virtual const char *what() const throw() { return _msg.c_str();}
 		};
 
-		static std::vector<ParsedServer> parse(const string &path); //
+		static std::vector<ParsedServer> parse(const string &path);
 
 };
 
 #endif
-

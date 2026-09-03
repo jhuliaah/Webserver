@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   CgiHandler.cpp                                     :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/09/03 13:45:15 by ratanaka         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #include "../../includes/CgiHandler.hpp"
 #include "../../includes/ErrorBuilder.hpp"
@@ -20,7 +9,6 @@
 #include <fcntl.h>
 #include <iostream>
 #include <unistd.h>
-
 
 static std::string resolve500Page(const LocationConfig& loc)
 {
@@ -53,12 +41,12 @@ char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 	if (!contentLength.empty()) {
 		envList.push_back("CONTENT_LENGTH=" + contentLength);
 	}
-	
+
 	std::string contentType = req.getHeader("Content-Type");
 	if (!contentType.empty()) {
 		envList.push_back("CONTENT_TYPE=" + contentType);
 	}
-	
+
 	char** envp = new char*[envList.size() + 1];
 	for (size_t i = 0; i < envList.size(); ++i){
 		envp[i] = new char[envList[i].size() + 1];
@@ -68,21 +56,6 @@ char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
 	return envp;
 }
 
-/*
-	Monta a resposta HTTP a partir do que o script CGI escreveu no stdout.
-
-	Dois formatos aceitos:
-	1) O script já manda a status line HTTP inteira por conta própria
-	   (ex.: os scripts de teste em cgi-bin/, que começam com
-	   "HTTP/1.1 200 OK\r\n..."). Nesse caso repassa direto -- prefixar
-	   outra status line por cima duplicava a linha e quebrava o response.
-	2) Formato CGI/1.1 "de verdade": só headers ("Chave: valor", um por
-	   linha), linha em branco, body -- sem status line. Se o script
-	   mandar um header "Status: 404 Not Found", esse vira o status code
-	   da resposta; sem "Status:", o padrão é 200. Aceita tanto "\r\n\r\n"
-	   quanto só "\n\n" como separador de headers/body, porque scripts
-	   simples com print() só mandam "\n".
-*/
 void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 {
 	if (buffer.empty())
@@ -113,7 +86,7 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 
 	if (sepPos == std::string::npos)
 	{
-		// Não achou fim de headers -> trata tudo como body cru.
+
 		res.headers["Content-Type"] = "text/html";
 		res.body = buffer;
 		client.setResponse(res.serialize());
@@ -136,7 +109,7 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 
 		size_t colon = line.find(':');
 		if (colon == std::string::npos)
-			continue; // linha sem ":" -> ignora, não é header válido
+			continue;
 
 		std::string key = line.substr(0, colon);
 		std::string value = line.substr(colon + 1);
@@ -144,7 +117,7 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 		value = (valueStart == std::string::npos) ? "" : value.substr(valueStart);
 
 		if (key == "Status")
-			res.status_code = std::atoi(value.c_str()); // "404 Not Found" -> 404
+			res.status_code = std::atoi(value.c_str());
 		else
 			res.headers[key] = value;
 	}
@@ -157,15 +130,9 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Client& client)
 {
 	(void)req;
-	// use location config values (if present) to determine CGI interpreter and script
+
 	std::string interpreter = loc.getCgiPath().empty() ? "/usr/bin/python3" : loc.getCgiPath();
-	// Antes isto ignorava loc.getRoot() e sempre montava "." + uri -- só
-	// funcionava porque cgi-bin/ mora na raiz do projeto e a location
-	// /cgi-bin não tinha "root" próprio (herdava "./www/" do server, que
-	// nunca era usado de verdade). Agora resolve igual Static/Delete/Upload:
-	// root da location (ou "./www" default) + uri -- então um "root ./;" no
-	// config decide de verdade onde o script mora, em vez de só coincidência
-	// de nome de pasta.
+
 	std::string root = loc.getRoot();
 	if (root.empty())
 		root = "./www";
@@ -173,8 +140,8 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		root.erase(root.size() - 1);
 	std::string scriptName = root + req.getUri();
 	std::string errorPage500 = resolve500Page(loc);
-	int pipe_in[2]; // Servidor escreve [1] -> python le [0]
-	int pipe_out[2]; // python escreve [1] -> servidor le [0]
+	int pipe_in[2];
+	int pipe_out[2];
 
 	if (pipe(pipe_in) == -1) {
 		std::cerr << "Error creating CGI input pipe" << std::endl;
@@ -203,7 +170,6 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		return true;
 	}
 
-	//processo filho (vira o python)
 	if (pid == 0) {
 		close(pipe_in[1]);
 		close(pipe_out[0]);
@@ -225,7 +191,7 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		std::cerr << "CGI execve failed" << std::endl;
 		std::exit(1);
 	}
-	//processo pai (o servidor epoll)
+
 	else {
 		close(pipe_in[0]);
 		close(pipe_out[1]);

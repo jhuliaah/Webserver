@@ -16,7 +16,7 @@ std::vector<string> Tokenizer::tokenize(const string &content)
             spaced += c;
             spaced += ' ';
         }
-        else if (c == '#') //for coments
+        else if (c == '#')
         {
             while (i <content.size() && content[i] != '\n')
              ++i;
