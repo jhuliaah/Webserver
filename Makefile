@@ -23,8 +23,10 @@ SRCS = srcs/main.cpp \
 OBJDIR = obj
 OBJS = $(SRCS:srcs/%.cpp=$(OBJDIR)/%.o)
 CC = c++
-CFLAGS = -fsanitize=address -g3 -std=c++98 -Wall -Wextra -Werror
+CFLAGS = -std=c++98 -Wall -Wextra -Werror
 RM = rm -rf
+
+# -fsanitize=address -g3
 
 all : $(NAME)
 

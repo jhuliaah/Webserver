@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/13 17:45:48 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/13 21:30:46 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/03 13:45:15 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,8 +28,7 @@ CgiHandler::~CgiHandler() {}
 
 const std::string& CgiHandler::getMethod() const
 {
-    /* TODO */
-    return _method; /* TODO */
+	return _method;
 }
 
 char **CgiHandler::CgiEnvBuilder(const HttpRequest& req)
@@ -86,7 +85,8 @@ void CgiHandler::parseCgiOutput(const std::string& buffer, Client& client)
 
 	if (buffer.compare(0, 5, "HTTP/") == 0)
 	{
-		client.setResponse(buffer);
+		std::string response = buffer;
+		client.setResponse(response);
 		client.setState(Client::WRITING);
 		return;
 	}
@@ -156,14 +156,30 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 	int pipe_in[2]; // Servidor escreve [1] -> python le [0]
 	int pipe_out[2]; // python escreve [1] -> servidor le [0]
 
-	if (pipe(pipe_in) == -1 || pipe(pipe_out) == -1) {
-		std::cerr << "Error creating CGI pipes" << std::endl;
-		return true; // TODO: implement 500 error later
+	if (pipe(pipe_in) == -1) {
+		std::cerr << "Error creating CGI input pipe" << std::endl;
+		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setState(Client::WRITING);
+		return true;
+	}
+	if (pipe(pipe_out) == -1) {
+		close(pipe_in[0]);
+		close(pipe_in[1]);
+		std::cerr << "Error creating CGI output pipe" << std::endl;
+		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setState(Client::WRITING);
+		return true;
 	}
 	pid_t pid = fork();
 
 	if (pid == -1) {
+		close(pipe_in[0]);
+		close(pipe_in[1]);
+		close(pipe_out[0]);
+		close(pipe_out[1]);
 		std::cerr << "Error forking CGI process" << std::endl;
+		client.setResponse(ErrorBuilder::build(500, ""));
+		client.setState(Client::WRITING);
 		return true;
 	}
 
@@ -176,8 +192,13 @@ bool CgiHandler::handle(const HttpRequest& req, const LocationConfig& loc, Clien
 		close(pipe_in[0]);
 		close(pipe_out[1]);
 
+		size_t slash = scriptName.find_last_of('/');
+		std::string scriptDirectory = (slash == std::string::npos) ? "." : scriptName.substr(0, slash);
+		std::string scriptFile = (slash == std::string::npos) ? scriptName : scriptName.substr(slash + 1);
+		if (chdir(scriptDirectory.c_str()) == -1)
+			std::exit(1);
 		char* scriptPath = const_cast<char*>(interpreter.c_str());
-		char* scriptNameArg = const_cast<char*>(scriptName.c_str());
+		char* scriptNameArg = const_cast<char*>(scriptFile.c_str());
 		char* argv[] = { scriptPath, scriptNameArg, NULL};
 		char** envp = CgiEnvBuilder(req);
 		execve(argv[0], argv, envp);

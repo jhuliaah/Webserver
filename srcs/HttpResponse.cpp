@@ -36,9 +36,12 @@ std::string HttpResponse::serialize() const
 	out << "HTTP/1.1 " << status_code << " " << getStatusMessage(status_code) << "\r\n";
 
 	bool hasContentLength = (headers.find("Content-Length") != headers.end());
+	bool hasConnection = (headers.find("Connection") != headers.end());
 
 	for (std::map<std::string, std::string>::const_iterator it = headers.begin(); it != headers.end(); ++it)
 		out << it->first << ": " << it->second << "\r\n";
+	if (!hasConnection)
+		out << "Connection: keep-alive\r\n";
 
 	if (!hasContentLength)
 		out << "Content-Length: " << body.length() << "\r\n";

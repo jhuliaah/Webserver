@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/05/27 14:06:07 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/09/01 16:28:08 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:03:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,6 +71,7 @@ bool Server::isServerFd(int fd) {
 void	Server::initServer() {
 	signal(SIGINT, handleShutdownSignal);
 	signal(SIGTERM, handleShutdownSignal);
+	signal(SIGPIPE, SIG_IGN);
 
     _epollFd = epoll_create(10);
 	if (_epollFd == -1)
@@ -88,7 +89,10 @@ void	Server::initServer() {
 		std::memset(&address, 0, sizeof(address));
 		address.sin_family		= AF_INET; // usando IPv4
 		address.sin_port		= htons(currentPort); // htons é um tradutor (portavai ser 8080)
-		address.sin_addr.s_addr	= inet_addr("127.0.0.1"); //por enquanto só vai aceitar conexões do localhost, mas futuramente vamos aceitar de qualquer lugar (INADDR_ANY)
+		std::string host = _servers[i].getHost();
+		if (host.empty())
+			host = "0.0.0.0";
+		address.sin_addr.s_addr	= inet_addr(host.c_str());
 	
 		//bind() -> este socket vai receber conexoes na porta 8080
 		if (bind(fd, (struct sockaddr*)&address, sizeof(address)) == -1){
@@ -173,7 +177,8 @@ void Server::removeClient(int fd) {
 
 		if (client->getCgiContext().pid != -1) {
 			kill(client->getCgiContext().pid, SIGKILL);
-			waitpid(client->getCgiContext().pid, NULL, WNOHANG);
+			waitpid(client->getCgiContext().pid, NULL, 0);
+			client->getCgiContext().pid = -1;
 		}
 	}
 
@@ -217,7 +222,7 @@ static std::string buildRedirectResponse(int statusCode, const std::string& targ
 	std::string body = "<html><body><h1>" + message + "</h1></body></html>";
 	oss << "HTTP/1.1 " << statusCode << " " << message << "\r\n"
 		<< "Location: " << target << "\r\n"
-		<< "Content-Type: text/html\r\n"
+		<< "Content-Type: text/html; charset=UTF-8\r\n"
 		<< "Content-Length: " << body.length() << "\r\n"
 		<< "\r\n"
 		<< body;
@@ -390,7 +395,15 @@ void Server::serverLoop(){
 					// Manda o Cliente enviar os próprios dados
 					Client* client = _clients[currentFd];
 					if (client->writeData() == true) {
-						removeClient(currentFd);
+						if (client->getState() == Client::CLOSED) {
+							removeClient(currentFd);
+						} else {
+							client->prepareNextRequest();
+							struct epoll_event event;
+							event.events = EPOLLIN;
+							event.data.fd = currentFd;
+							epoll_ctl(_epollFd, EPOLL_CTL_MOD, currentFd, &event);
+						}
 					}
 				}
             }
@@ -415,7 +428,7 @@ void Server::checkTimeouts() {
 		int clientFd = it->first;
         
 		if (client->getState() == Client::CGI_RUNNING) {
-			if (now - client->getCgiContext().startTime > 5) {
+			if (now - client->getCgiContext().startTime > 30) {
 				std::cout << "[TIMEOUT 504] CGI script on fd " << clientFd << " timed out. Killing process!" << std::endl;
 				if (client->getCgiContext().pid != -1){
 					kill(client->getCgiContext().pid, SIGKILL);
@@ -437,7 +450,7 @@ void Server::checkTimeouts() {
 					client->getCgiContext().stdin_fd = -1;
 				}
 				
-				std::string error504 = "HTTP/1.1 504 Gateway Timeout\r\nContent-Type: text/html\r\nContent-Length: 47\r\n\r\n<html><body><h1>504 Gateway Timeout</h1></body></html>";
+				std::string error504 = "HTTP/1.1 504 Gateway Timeout\r\nConnection: close\r\nContent-Type: text/html; charset=UTF-8\r\nContent-Length: 47\r\n\r\n<html><body><h1>504 Gateway Timeout</h1></body></html>";
 				client->setResponse(error504);
 				client->setState(Client::WRITING);
 
@@ -471,7 +484,26 @@ void Server::handleCgiWrite(int pipeFd) {
 		if (bytesWritten > 0) {
 			client->getCgiContext().inputSent += bytesWritten;
 			std::cout << "[CGI] Wrote " << bytesWritten << " bytes to the Python stdin pipe" << std::endl;
-		} else if (bytesWritten < 0){ return; }
+		} else if (bytesWritten == 0) {
+			return;
+		} else if (bytesWritten < 0) {
+			epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+			close(pipeFd);
+			_cgiWritePipes.erase(pipeFd);
+			client->getCgiContext().stdin_fd = -1;
+			if (client->getCgiContext().pid != -1) {
+				kill(client->getCgiContext().pid, SIGKILL);
+				waitpid(client->getCgiContext().pid, NULL, 0);
+				client->getCgiContext().pid = -1;
+			}
+			client->setResponse(ErrorBuilder::build(500, ""));
+			client->setState(Client::WRITING);
+			struct epoll_event event;
+			event.events = EPOLLOUT;
+			event.data.fd = client->getFd();
+			epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
+			return;
+		}
 	}
 	
 	if (client->getCgiContext().inputSent >= body.length()){
@@ -502,7 +534,28 @@ void Server::handleCgiOutput(int pipeFd) {
 		_cgiPipes.erase(pipeFd);
 
 		CgiHandler::parseCgiOutput(client->getCgiContext().cgiOutput, *client);
+		if (client->getCgiContext().pid != -1) {
+			waitpid(client->getCgiContext().pid, NULL, 0);
+			client->getCgiContext().pid = -1;
+		}
 		
+		struct epoll_event event;
+		event.events = EPOLLOUT;
+		event.data.fd = client->getFd();
+		epoll_ctl(_epollFd, EPOLL_CTL_MOD, client->getFd(), &event);
+	}
+	else if (bytesRead < 0) {
+		epoll_ctl(_epollFd, EPOLL_CTL_DEL, pipeFd, NULL);
+		close(pipeFd);
+		_cgiPipes.erase(pipeFd);
+		client->getCgiContext().stdout_fd = -1;
+		if (client->getCgiContext().pid != -1) {
+			kill(client->getCgiContext().pid, SIGKILL);
+			waitpid(client->getCgiContext().pid, NULL, 0);
+			client->getCgiContext().pid = -1;
+		}
+		client->setResponse(ErrorBuilder::build(500, ""));
+		client->setState(Client::WRITING);
 		struct epoll_event event;
 		event.events = EPOLLOUT;
 		event.data.fd = client->getFd();

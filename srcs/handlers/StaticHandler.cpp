@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/12 17:27:47 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/09/01 15:32:58 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:03:31 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -110,7 +110,7 @@ bool StaticHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 
 			HttpResponse res;
 			res.status_code = 200;
-			res.headers["Content-Type"] = "text/html";
+			res.headers["Content-Type"] = "text/html; charset=UTF-8";
 			std::string body = buildAutoIndex(filePath, req.getUri());
 			if (isHead)
 				body.clear();
@@ -198,7 +198,7 @@ std::string StaticHandler::getMimeType(const std::string& path){
 	if (dotPos == std::string::npos) {return "text/plain";}
 	
 	std::string ext = path.substr(dotPos);
-	if (ext == ".html" || ext == ".htm") return "text/html";
+	if (ext == ".html" || ext == ".htm") return "text/html; charset=UTF-8";
 	if (ext == ".css")  return "text/css";
 	if (ext == ".js")   return "text/javascript";
 	if (ext == ".png")  return "image/png";

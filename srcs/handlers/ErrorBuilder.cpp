@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/08/13 20:30:13 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 20:37:18 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:03:08 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,7 +62,7 @@ std::string ErrorBuilder::build(int errorCode, const std::string& customPagePath
 	}
 	std::stringstream response;
 	response << "HTTP/1.1 " << errorCode << " " << message << "\r\n";
-	response << "Content-Type: text/html\r\n";
+	response << "Content-Type: text/html; charset=UTF-8\r\n";
 	response << "Content-Length: " << body.length() << "\r\n";
 	response << "Connection: close\r\n\r\n";
 	response << body;

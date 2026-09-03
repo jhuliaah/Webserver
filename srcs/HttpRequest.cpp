@@ -1,6 +1,7 @@
 // Aqui só um esqueleto, mas tem mais coisa no webserv do Fabio.
 
 #include "../includes/HttpRequest.hpp"
+#include <cctype>
 
 HttpRequest::HttpRequest() {}
 
@@ -17,6 +18,20 @@ std::string HttpRequest::getHeader(const std::string& name) const {
     std::map<std::string, std::string>::const_iterator it = _headers.find(name);
     if (it != _headers.end()) {
         return it->second;
+    }
+    for (it = _headers.begin(); it != _headers.end(); ++it) {
+        if (it->first.size() != name.size())
+            continue;
+        bool equal = true;
+        for (size_t i = 0; i < name.size(); ++i) {
+            if (std::tolower(static_cast<unsigned char>(it->first[i]))
+                != std::tolower(static_cast<unsigned char>(name[i]))) {
+                equal = false;
+                break;
+            }
+        }
+        if (equal)
+            return it->second;
     }
     return "";
 }

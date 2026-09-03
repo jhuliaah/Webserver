@@ -21,6 +21,7 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 		HttpResponse res;
 		res.status_code = 400;
 		res.headers["Content-Type"] = "text/html";
+		res.headers["Content-Type"] = "text/html; charset=UTF-8";
 		res.body = "<html><body><center><h1>400 Bad Request</h1>"
 			"<p>No filename in URI</p></center></body></html>";
 		client.setResponse(res.serialize());
@@ -75,6 +76,7 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 	HttpResponse res;
 	res.status_code = 201;
 	res.headers["Content-Type"] = "text/html";
+		res.headers["Content-Type"] = "text/html; charset=UTF-8";
 	res.headers["Location"] = uri;
 	res.body = "<html><body><center><h1>201 Created</h1><p>Uploaded to "
 		+ uri + "</p></center></body></html>";

@@ -6,7 +6,7 @@
 /*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/06/23 12:16:26 by ratanaka          #+#    #+#             */
-/*   Updated: 2026/08/13 21:26:30 by ratanaka         ###   ########.fr       */
+/*   Updated: 2026/09/03 14:25:50 by ratanaka         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,6 +60,7 @@ class Client {
 
 		bool readData();
 		bool writeData();
+		void prepareNextRequest();
 		bool isTimeout(time_t currentTime, int timeoutLimit);
 
 		int		getFd() const { return _fd; }
