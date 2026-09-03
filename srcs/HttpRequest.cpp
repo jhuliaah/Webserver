@@ -1,4 +1,3 @@
-// Aqui só um esqueleto, mas tem mais coisa no webserv do Fabio.
 
 #include "../includes/HttpRequest.hpp"
 #include <cctype>

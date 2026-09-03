@@ -1,5 +1,4 @@
 
-
 #include "../includes/HttpParser.hpp"
 
 HttpParser::HttpParser() : _state(REQUEST_LINE) {}
@@ -15,14 +14,6 @@ static std::string trim(const std::string& s)
     return s.substr(start, end - start + 1);
 }
 
-/*
-	StaticHandler/DeleteHandler/UploadHandler todos só colam loc.root + uri
-	(ex.: "./www" + uri) sem nenhuma checagem de traversal própria, então uma
-	uri com segmento ".." (ex.: GET /../../../../etc/passwd) escapa do root
-	configurado inteiro e lê/escreve/apaga arquivo de fora do www/. Rejeitar
-	isso uma vez aqui, no parse, fecha o buraco pra todo handler de uma vez
-	em vez de remendar cada um separado.
-*/
 static bool hasDotDotSegment(const std::string& path)
 {
     size_t pos = 0;
@@ -70,7 +61,7 @@ bool HttpParser::parseRequestLineFrom(const std::string& raw, size_t& pos, HttpR
     size_t qPos = target.find('?');
     std::string uriOnly = (qPos != std::string::npos) ? target.substr(0, qPos) : target;
     if (hasDotDotSegment(uriOnly))
-        return (false); // ".." no path -> tratado como 400, nunca chega nos handlers
+        return (false);
     if (qPos != std::string::npos)
     {
         req.setUri(target.substr(0, qPos));
@@ -94,7 +85,7 @@ bool HttpParser::parseHeadersFrom(const std::string& raw, size_t& pos, HttpReque
 		if (lineEnd == std::string::npos)
 			return false;
 
-		if (lineEnd == pos) // linha vazia -> fim dos headers
+		if (lineEnd == pos)
 		{
 			pos = lineEnd + 2;
             if (req.getVersion() == "HTTP/1.1" && req.getHeader("Host").empty())
@@ -107,7 +98,7 @@ bool HttpParser::parseHeadersFrom(const std::string& raw, size_t& pos, HttpReque
 
 		size_t colon = line.find(':');
 		if (colon == std::string::npos)
-			return false; // header sem ":" -> malformado
+			return false;
 
 		std::string key = trim(line.substr(0, colon));
 		std::string value = trim(line.substr(colon + 1));

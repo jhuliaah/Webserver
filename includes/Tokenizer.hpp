@@ -6,7 +6,7 @@
 #include <vector>
 typedef std::string string;
 
-class Tokenizer 
+class Tokenizer
 {
 
     public:

@@ -12,7 +12,6 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 {
 	std::string uri = req.getUri();
 
-	// nome do arquivo = último pedaço da URI (ex.: /uploads/foto.png -> foto.png)
 	size_t lastSlash = uri.find_last_of('/');
 	std::string filename = (lastSlash == std::string::npos) ? uri : uri.substr(lastSlash + 1);
 
@@ -31,32 +30,25 @@ bool UploadHandler::handle(const HttpRequest& req, const LocationConfig& loc, Cl
 
 	std::string filePath;
 	if (!loc.getUploadDir().empty()) {
-		// upload_dir explícito na location: pasta de armazenamento
-		// dedicada, separada de onde o GET serve os arquivos -- só o
-		// nome do arquivo importa aqui, não o resto do caminho da URI.
+
 		std::string dir = loc.getUploadDir();
 		if (dir[dir.size() - 1] == '/')
 			dir.erase(dir.size() - 1);
 		filePath = dir + "/" + filename;
 	} else {
-		// sem upload_dir: usa root + URI inteira, exatamente como
-		// StaticHandler/DeleteHandler resolvem o mesmo caminho -- assim
-		// o arquivo aparece onde um GET/DELETE subsequente vai procurar.
+
 		std::string root = loc.getRoot().empty() ? "./www" : loc.getRoot();
 		if (root[root.size() - 1] == '/')
 			root.erase(root.size() - 1);
-		filePath = root + uri; // uri já começa com "/"
+		filePath = root + uri;
 	}
 
-	// error_page 500 ...; resolvido uma vez -- usado nos dois pontos de
-	// falha abaixo em vez de sempre cair na página genérica do ErrorBuilder.
 	std::string errorPage500 = "";
 	const std::map<int, std::string>& errorPages500 = loc.getErrorPages();
 	std::map<int, std::string>::const_iterator it500 = errorPages500.find(500);
 	if (it500 != errorPages500.end())
 		errorPage500 = ErrorBuilder::resolvePagePath(loc.getRoot(), it500->second);
 
-	// confere se o diretório pai existe de verdade antes de tentar escrever
 	size_t dirEnd = filePath.find_last_of('/');
 	std::string parentDir = (dirEnd == std::string::npos) ? "." : filePath.substr(0, dirEnd);
 	struct stat dirStat;

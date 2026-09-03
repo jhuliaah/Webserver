@@ -20,8 +20,6 @@ static LocationConfig toLocationConfig(const ParsedLocation &src, const ParsedSe
 	return loc;
 }
 
-/* Converte a struct ParsedServer (ConfigTypes.hpp) para a classe ServerConfig
-(ServerConfig.hpp) usada pelo resto do servidor. */
 static ServerConfig toServerConfigClass(const ParsedServer &src)
 {
 	ServerConfig server;

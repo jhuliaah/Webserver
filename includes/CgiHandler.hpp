@@ -1,14 +1,3 @@
-/* ************************************************************************** */
-/*                                                                            */
-/*                                                        :::      ::::::::   */
-/*   CgiHandler.hpp                                     :+:      :+:    :+:   */
-/*                                                    +:+ +:+         +:+     */
-/*   By: ratanaka <ratanaka@student.42.fr>          +#+  +:+       +#+        */
-/*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/06/13 17:45:50 by eduribei          #+#    #+#             */
-/*   Updated: 2026/08/13 21:30:11 by ratanaka         ###   ########.fr       */
-/*                                                                            */
-/* ************************************************************************** */
 
 #ifndef CGI_HANDLER_HPP
 # define CGI_HANDLER_HPP
@@ -20,7 +9,6 @@ class CgiHandler : public IRequestHandler
 {
 	private:
 		std::string _method;
-
 
 	public:
 		CgiHandler();

@@ -25,7 +25,6 @@ class HttpParser
     bool    parseHeadersFrom(const std::string& raw, size_t& pos, HttpRequest& req);
     bool    parseBodyFrom(const std::string& raw, size_t& pos, HttpRequest& req);
 
-
     public:
         HttpParser();
         ~HttpParser();
@@ -33,6 +32,5 @@ class HttpParser
         State parse(const std::string& raw, HttpRequest& req);
         State getState() const { return _state; };
 };
-
 
 #endif
